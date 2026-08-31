@@ -23,6 +23,7 @@ except ImportError:
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary
 
 def run_reddit_story_pipeline(
+    target_subreddit: Optional[str] = None,
     custom_post: Optional[Dict[str, Any]] = None,
     output_base_dir: str = "checkpoint/reddit_videos",
     model_name: str = "gemini-flash-lite-latest",
@@ -47,7 +48,8 @@ def run_reddit_story_pipeline(
         if custom_post:
             story_raw = custom_post
         else:
-            candidates = fetch_top_high_cpm_stories(max_stories=5)
+            subs_to_scan = [target_subreddit] if target_subreddit else None
+            candidates = fetch_top_high_cpm_stories(subreddits=subs_to_scan, max_stories=5)
             story_raw = candidates[0]
 
         timestamp_id = int(time.time())
@@ -189,6 +191,6 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="gemini-flash-lite-latest", help="Gemini model")
     args = parser.parse_args()
 
-    print("🚀 Starting Reddit Story Video Studio Pipeline...")
-    res = run_reddit_story_pipeline(model_name=args.model)
+    print(f"🚀 Starting Reddit Story Video Studio Pipeline for r/{args.sub}...")
+    res = run_reddit_story_pipeline(target_subreddit=args.sub, model_name=args.model)
     print(f"✅ Video generation finished! Check results in: {res.get('video_dir')}")

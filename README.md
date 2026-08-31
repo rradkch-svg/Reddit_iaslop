@@ -1,73 +1,60 @@
-# AI Slop Studio - Plataforma Autônoma de Vídeo (9:16)
+# Reddit Story Studio — Viral High-CPM Video Generator
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Diátaxis Documentation](https://img.shields.io/badge/docs-Diátaxis-green.svg)](docs/README.md)
 
-AI Slop Studio é uma plataforma autônoma e resiliente para produção automatizada em lote de vídeos verticais (Shorts, Reels, TikTok) no formato 9:16, alimentada por um ecossistema multi-agentes (Gemini 2.5/Flash-Lite), síntese neural de voz (Edge-TTS), coleta e auditoria concorrente de clipes B-Roll (YouTube/yt-dlp) e legendas dinâmicas animadas estilo Hormozi.
+Plataforma profissional e autônoma para produção automatizada de vídeos do Reddit em alta qualidade (High CPM), especializada em:
+1. **Vídeos Curtos (Shorts / Reels / TikTok 9:16):** Duração estendida de até 2.5 minutos com Card Oficial do Reddit, ritmo acelerado e pergunta de engajamento no final (CTA).
+2. **Vídeos Longos (YouTube 16:9):** Narrativa profunda de **25 minutos** de uma **HISTÓRIA ÚNICA** (não um compilado), estruturada em 8 capítulos cronológicos da mesma história com cards e timestamps.
+3. **Gameplay HD 1080p60:** Fundos de gameplay em alta resolução 1080x1920 e 1920x1080/2560x1440 a 60 fps (Minecraft Parkour sem copyright).
+4. **Legendas Dinâmicas Hormozi:** Efeito palavra por palavra com destaque de alto contraste.
+5. **Vozes Neurais:** Personas vocais automáticas adaptadas ao tom de cada relato.
 
 ---
 
 ## 🏗️ Estrutura do Projeto
 
-O projeto segue rigorosamente os protocolos da **Systematic Project Architecture** e **Clean-Root Invariant**:
-
 ```text
 automotive-slop/
 ├── .env.example                 # Modelo de variáveis de ambiente
-├── .gitignore                   # Arquivos e pastas ignorados no controle de versão
+├── .gitignore                   # Arquivos ignorados no controle de versão
 ├── AGENTS.md                    # Regras operacionais do projeto
 ├── GEMINI.md                    # Protocolo operacional global
-├── pyproject.toml               # Configuração do pacote Python
 ├── requirements.txt             # Dependências de bibliotecas
 ├── README.md                    # Visão geral do repositório
 │
 ├── src/                         # Código-fonte principal da aplicação
 │   ├── __init__.py
-│   ├── agents.py                # Agentes IA (Proposer, Evaluator, Director, Reviewer)
-│   ├── app.py                   # Interface Web Streamlit interativa
-│   ├── audio.py                 # Síntese neural de voz com Edge-TTS
-│   ├── auto_pipeline.py         # Motor de processamento autônomo em lote
-│   ├── broll_engine.py          # Busca, download e auditoria multimodal de B-Rolls
-│   ├── checkpoint_manager.py    # Persistência atômica de checkpoints e blacklist
-│   ├── logger.py                # Logging estruturado e detecção de throttling
-│   ├── render.py                # Montagem e renderização final com FFmpeg
-│   ├── subtitles.py             # Legendas ASS dinâmicas estilo Hormozi (Pill Box)
-│   ├── visual_engine.py         # Motor de cartões e infográficos visuais 1080x1920
-│   └── watchdog.py              # Supervisor de auto-restart e resiliência
+│   ├── gemini_client.py         # Cliente Gemini com redundância e rate limiter
+│   ├── app.py                   # Painel Web Streamlit interativo
+│   ├── auto_pipeline.py         # Pipeline de geração automática em lote
+│   ├── reddit_agents.py         # Otimizador de roteiros e diretor de 25 minutos
+│   ├── reddit_audio.py          # Síntese neural de voz por persona (Edge-TTS)
+│   ├── reddit_longform.py       # Gerador de vídeo de 25 min de história única
+│   ├── reddit_pipeline.py       # Pipeline de produção de Shorts (9:16)
+│   ├── reddit_render.py         # Renderização FFmpeg com overlay de Cards e Legendas
+│   ├── reddit_scraper.py        # Raspador ao vivo de subreddits de alto CPM
+│   ├── reddit_subtitles.py      # Gerador de legendas dinâmicas ASS Hormozi
+│   ├── reddit_visuals.py        # Motor de Cards Oficiais do Reddit (Dark Theme)
+│   └── logger.py                # Logging estruturado e controle de execução
 │
-├── scripts/                     # Scripts utilitários, automação e inicializadores
-│   ├── auto_recovery.bat        # Recuperação acionada pelo Agendador do Windows
-│   ├── iniciar.bat              # Atalho de inicialização
-│   ├── iniciar_auto.bat         # Inicialização do pipeline autônomo
-│   ├── iniciar_auto_geracao.bat # Inicializador completo da geração em batches
-│   ├── iniciar_backend.bat      # Inicializador do painel WebUI Streamlit
-│   ├── iniciar_watchdog.bat     # Inicializador do Watchdog supervisor
-│   ├── setup_task.ps1           # Script PowerShell do Agendador de Tarefas
-│   ├── registrar_agendador_tarefas.bat # Registra o Watchdog no Task Scheduler
-│   ├── verificar_agendador_tarefas.bat # Exibe status em tempo real do agendador
-│   ├── remover_agendador_tarefas.bat   # Remove a tarefa do Task Scheduler
-│   ├── ativar_autologon.bat     # Ativa login automático no Windows
-│   ├── desativar_autologon.bat  # Desativa login automático no Windows
-│   └── benchmark_concurrency.py # Teste de concorrência e throughput
+├── scripts/                     # Scripts de automação e atalhos
+│   ├── download_hd_backgrounds.py # Downloader de backgrounds em 1080p60 HD
+│   ├── gerar_video_reddit.bat     # Atalho para geração de Shorts 9:16
+│   ├── gerar_longform_25min.bat   # Atalho para geração de História Única de 25min
+│   ├── iniciar.bat                # Atalho para inicializar o painel WebUI
+│   └── iniciar_backend.bat        # Inicializador do painel WebUI Streamlit
 │
 ├── tests/                       # Suíte de testes automatizados
-│   ├── __init__.py
-│   ├── test_backend.py          # Testes de integração dos motores
-│   └── test_pipeline_comprehensive.py # Testes de ponta a ponta do pipeline
+│   ├── test_background_resolutions.py # Validação de resolução 1080p60
+│   ├── test_reddit_card_overlay.py    # Validação do overlay do Card do Reddit
+│   ├── test_shorts_script_cta.py      # Validação de duração e CTA nos Shorts
+│   └── test_longform_single_story.py  # Validação da história única de 25min
 │
-├── docs/                        # Documentação Técnica Canônica (Diátaxis Framework)
-│   ├── README.md                # Índice geral da documentação
-│   ├── tutorials/               # Lições práticas guiadas
-│   ├── how-to/                  # Guias de solução de problemas e receitas
-│   ├── reference/               # Especificações técnicas e contratos de API
-│   └── explanation/             # Fundamentação teórica e decisões de arquitetura
+├── assets/                      # Recursos visuais e vídeos de fundo
+│   └── backgrounds/             # Vídeos de gameplay 1080p60 HD
 │
-├── assets/                      # Recursos visuais, estáticos e referências
-│   └── referencias/
-│
-├── checkpoint/                  # Checkpoints atômicos e vídeos gerados (ignorado no git)
-└── logs/                        # Logs de execução diários (ignorado no git)
+└── checkpoint/                  # Checkpoints e vídeos masters gerados
 ```
 
 ---
@@ -76,31 +63,25 @@ automotive-slop/
 
 ### 1. Pré-requisitos
 - Python 3.10+ (recomendado Python 3.11)
-- FFmpeg instalado e no PATH
-- Chave de API do Google Gemini (configurada em `.env` ou `gemini-api.txt`)
+- FFmpeg instalado
+- Chave de API do Google Gemini (opcional, fallback algorítmico ativo)
 
-Instalação das dependências:
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Executando o Pipeline
+### 2. Executando o Estúdio
 
 - **Painel Interativo (WebUI):**
-  Execute `scripts\iniciar_backend.bat` e acesse `http://localhost:8501`.
+  Execute `iniciar.bat` ou `scripts\iniciar_backend.bat` e acesse `http://localhost:8501`.
 
-- **Geração Autônoma Contínua com Watchdog:**
-  Execute `scripts\iniciar_watchdog.bat`.
+- **Gerar Short 9:16 (até 2.5 min com CTA):**
+  ```bash
+  python -m src.reddit_pipeline --sub maliciouscompliance
+  ```
 
-- **Registrar Recuperação Automática no Windows:**
-  Execute `scripts\registrar_agendador_tarefas.bat`.
+- **Gerar Vídeo Longo de 25 Minutos (História Única):**
+  ```bash
+  python -m src.reddit_longform
+  ```
 
----
-
-## 📖 Documentação Completa
-
-Consulte a [Documentação Técnica em `docs/`](docs/README.md) organizada conforme o Diátaxis Framework:
-- [Tutorial de Início Rápido](docs/tutorials/01_quickstart.md)
-- [Guia do Watchdog e Recuperação](docs/how-to/05_auto_recovery_and_watchdog.md)
-- [Arquitetura do Sistema](docs/reference/01_system_architecture.md)
-- [Filosofia Multi-Agentes](docs/explanation/01_multi_agent_philosophy.md)
+- **Executar Testes:**
+  ```bash
+  python -m unittest discover -s tests
+  ```

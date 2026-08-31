@@ -13,7 +13,6 @@ gemini-api.txt
 cookies.txt
 *cookie*.txt
 
-
 # Logs, checkpoints, and data
 logs/
 checkpoint/
@@ -21,19 +20,20 @@ data/
 *.lock
 .pipeline.lock
 
-# Temporary and legacy test outputs
-project_*/
-test_output/
-test_output_new/
-test_comprehensive_output/
-benchmark_run_*/
-custom_project/
+# Media & temporary files
+assets/backgrounds/*.mp4
+assets/backgrounds/*.webm
+assets/backgrounds/*.part
+*.part
+*.ytdl
 *.mp4
 *.png
 *.ass
 *.mp3
 
-# Analytics ZIP exports
+# Obsolete metrics
+METRICAS_VIDEOS.csv
+METRICAS_VIDEOS.md
 analytics/*.zip
 analytics/*.csv
 !analytics/.gitkeep

@@ -1,4 +1,4 @@
-﻿import os
+import os
 import glob
 import subprocess
 from typing import List, Tuple, Optional, Dict, Any
@@ -26,21 +26,59 @@ def find_ffmpeg_binary() -> str:
     return "ffmpeg"
 
 def get_media_duration(file_path: str, ffmpeg_bin: Optional[str] = None) -> float:
-    """Retorna a duração exata do arquivo em segundos."""
+    """Retorna a duração exata do arquivo em segundos via FFmpeg stderr."""
     ff = ffmpeg_bin or find_ffmpeg_binary()
-    ffprobe = ff.replace("ffmpeg.exe", "ffprobe.exe") if "ffmpeg.exe" in ff else "ffprobe"
-    
-    cmd = [
-        ffprobe, "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        file_path
-    ]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=10)
-        return float(res.stdout.strip())
+        cmd = [ff, "-i", file_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, errors="ignore")
+        import re
+        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", res.stderr)
+        if m:
+            hours, mins, secs = float(m.group(1)), float(m.group(2)), float(m.group(3))
+            return hours * 3600 + mins * 60 + secs
     except Exception:
-        return 45.0
+        pass
+    return 45.0
+
+def get_best_orbital_background(aspect_ratio: str = "9:16") -> Optional[str]:
+    """Localiza o melhor vídeo de gameplay em assets/backgrounds."""
+    is_vertical = (aspect_ratio == "9:16")
+    bg_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "backgrounds")
+    
+    candidates = []
+    for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
+        fn = os.path.basename(f).lower()
+        if is_vertical:
+            if "vertical" in fn or "p9xlr1bobyw" in fn or "lkx3805bia8" in fn or "xlze_oo4wqs" in fn:
+                candidates.append(f)
+        else:
+            if "horizontal" in fn or "u7ieztmf" in fn or "erilpuq5yms" in fn or "64dw7xvh" in fn:
+                candidates.append(f)
+
+    if not candidates:
+        candidates = glob.glob(os.path.join(bg_dir, "*.mp4"))
+
+    return candidates[0] if candidates else None
+
+def get_orbital_backgrounds(aspect_ratio: str = "16:9") -> List[str]:
+    """Retorna lista de vídeos de gameplay disponíveis em assets/backgrounds."""
+    is_vertical = (aspect_ratio == "9:16")
+    bg_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "backgrounds")
+    
+    candidates = []
+    for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
+        fn = os.path.basename(f).lower()
+        if is_vertical:
+            if "vertical" in fn or "p9xlr1bobyw" in fn or "lkx3805bia8" in fn or "xlze_oo4wqs" in fn:
+                candidates.append(f)
+        else:
+            if "horizontal" in fn or "u7ieztmf" in fn or "erilpuq5yms" in fn or "64dw7xvh" in fn:
+                candidates.append(f)
+
+    if not candidates:
+        candidates = glob.glob(os.path.join(bg_dir, "*.mp4"))
+
+    return candidates
 
 def render_reddit_story_video(
     audio_path: str,
@@ -49,50 +87,49 @@ def render_reddit_story_video(
     output_video_path: str,
     background_video_path: Optional[str] = None,
     aspect_ratio: str = "9:16",
-    card_duration_sec: float = 3.8,
+    card_duration_sec: float = 4.8,
     status_callback = None
 ) -> Tuple[bool, str]:
     """
-    Renderiza o vídeo final completo em passo único de altíssima performance:
-    - Fundo dinâmico 60fps (gameplay customizado ou lavfi sintético de alto dinamismo);
-    - Sobreposição do Card oficial do Reddit nos primeiros 3.8s com transição fade suave;
-    - Queima de legendas animadas palavra por palavra (Pill Box Hormozi);
-    - Áudio neural integrado.
+    Renderiza o vídeo final com fundo de gameplay real em 1080p60fps,
+    Card oficial do Reddit em destaque por card_duration_sec e legendas dinâmicas palavra por palavra.
     """
     with LogSpan("render_reddit_story_video", extra={"output": output_video_path, "ratio": aspect_ratio}):
         ffmpeg_bin = find_ffmpeg_binary()
         is_vertical = (aspect_ratio == "9:16")
         target_w = 1080 if is_vertical else 1920
         target_h = 1920 if is_vertical else 1080
-        src_w = 540 if is_vertical else 960
-        src_h = 960 if is_vertical else 540
 
         if not os.path.exists(audio_path):
             return False, f"Arquivo de áudio não encontrado: {audio_path}"
 
+        total_duration = get_media_duration(audio_path, ffmpeg_bin) + 0.4
         work_dir = os.path.dirname(output_video_path)
         os.makedirs(work_dir, exist_ok=True)
 
+        bg_to_use = background_video_path or get_best_orbital_background(aspect_ratio=aspect_ratio)
+        
         safe_ass = os.path.abspath(ass_subtitles_path).replace("\\", "/").replace(":", "\\:")
         fade_out_st = max(1.0, card_duration_sec - 0.4)
 
         if status_callback:
-            status_callback(f"🎬 Renderizando Master Video {aspect_ratio} 60fps com Card do Reddit e Legendas Hormozi...")
+            status_callback(f"🎬 Compondo vídeo {aspect_ratio} 60fps com gameplay HD, Card do Reddit e Legendas...")
 
-        # Monta pipeline single-pass
-        if background_video_path and os.path.exists(background_video_path):
-            bg_input_args = ["-stream_loop", "-1", "-i", background_video_path]
+        if bg_to_use and os.path.exists(bg_to_use):
+            bg_input_args = ["-stream_loop", "-1", "-i", bg_to_use]
             filter_complex = (
                 f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
-                f"[1:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.35:alpha=1[card_faded];"
+                f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
                 f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
                 f"[v_card]ass=filename='{safe_ass}'[vout]"
             )
         else:
+            src_w = 540 if is_vertical else 960
+            src_h = 960 if is_vertical else 540
             bg_input_args = ["-f", "lavfi", "-i", f"testsrc2=size={src_w}x{src_h}:rate=60"]
             filter_complex = (
                 f"[0:v]scale={target_w}:{target_h}:flags=bicubic,eq=brightness=-0.32:contrast=1.25:saturation=1.4[bg];"
-                f"[1:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.35:alpha=1[card_faded];"
+                f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
                 f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
                 f"[v_card]ass=filename='{safe_ass}'[vout]"
             )
@@ -100,11 +137,12 @@ def render_reddit_story_video(
         cmd = [
             ffmpeg_bin, "-y",
             *bg_input_args,
-            "-i", card_png_path,
+            "-loop", "1", "-i", card_png_path,
             "-i", audio_path,
             "-filter_complex", filter_complex,
             "-map", "[vout]",
             "-map", "2:a",
+            "-t", f"{total_duration:.2f}",
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-crf", "18",
