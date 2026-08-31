@@ -31,12 +31,12 @@ python -m src.reddit_pipeline --sub legaladvice --model gemini-flash-lite-latest
 
 ---
 
-## 2. Estrutura dos Arquivos Gerados (Padrão Oficial de Batches Dual)
+## 2. Estrutura dos Arquivos Gerados (Padrão Oficial de Batches)
 
-Todos os vídeos e metadados são organizados estritamente na estrutura de lotes contínuos com subpastas dedicadas:
+Todos os vídeos e metadados são organizados estritamente na estrutura de lotes contínuos de 10 vídeos:
 `checkpoint/auto_batches/batch_1/video_0/`, `video_1/` ... `video_9/` (e progressão para `batch_2`, `batch_3`...)
 
-Dentro de cada slot de vídeo (`video_X`):
+### 🌟 Slot `video_0` (Formato DUAL Especial):
 ```text
 checkpoint/auto_batches/batch_1/video_0/
 ├── longform_25min/
@@ -54,4 +54,15 @@ checkpoint/auto_batches/batch_1/video_0/
     ├── subtitles_teaser.ass           # Legendas Pill Box animadas
     ├── final_hook_badge.png           # Banner visual de tela "👉 FULL 25-MIN SAGA ON CHANNEL"
     └── metadata_teaser.txt            # Metadados e links para o vídeo longo
+```
+
+### 🚀 Slots `video_1` a `video_9` (Shorts Individuais Normais):
+```text
+checkpoint/auto_batches/batch_1/video_1/ (a video_9/)
+├── reddit_story_short_9x16.mp4        # Short vertical (9:16) de até 2.5 min com CTA
+├── narration_shorts.mp3               # Áudio neural da persona acelerado (+20%)
+├── script_data.json                   # Roteiro com gancho de 3s e pergunta de comentários
+├── subtitles_shorts.ass               # Legendas dinâmicas estilo Hormozi
+├── reddit_card_9x16.png               # Card Oficial do Reddit
+└── metadata.txt                       # Título, descrição e hashtags
 ```

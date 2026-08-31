@@ -57,9 +57,13 @@ automotive-slop/
 ├── checkpoint/                  # Checkpoints e vídeos masters gerados
 │   └── auto_batches/            # Estrutura oficial: batch_1, batch_2... (10 slots por lote)
 │       └── batch_1/
-│           └── video_0/ ... video_9/
-│               ├── longform_25min/          # 🎬 Master Longform 25min (16:9) + 8 chunks + narration
-│               └── teaser_short/            # ⚡ Teaser Short (9:16) com Gancho Final de tela
+│           ├── video_0/                     # 🌟 SLOT ESPECIAL DUAL
+│           │   ├── longform_25min/          # 🎬 Master Longform 25min (16:9) + 8 chunks + narration
+│           │   └── teaser_short/            # ⚡ Teaser Short (9:16) com Gancho Final de tela
+│           ├── video_1/                     # 🚀 SHORTS INDIVIDUAIS NORMAIS
+│           │   ├── reddit_story_short_9x16.mp4
+│           │   └── script_data.json
+│           └── ... video_9/
 ```
 
 ---
@@ -76,12 +80,13 @@ automotive-slop/
 - **Painel Interativo (WebUI):**
   Execute `iniciar.bat` ou `scripts\iniciar_backend.bat` e acesse `http://localhost:8501`.
 
-- **Geração Automática Contínua Dual (25min Master + Teaser Short por slot):**
+- **Geração Automática Contínua de Lotes (video_0 Dual + video_1..9 Shorts):**
+  Execute `scripts\iniciar_auto_geracao.bat` ou:
   ```bash
-  python src/auto_pipeline.py --mode dual --count 10
+  python src/auto_pipeline.py --count 10
   ```
 
-- **Gerar Teaser Short 9:16 com Gancho Final no próximo slot:**
+- **Gerar Short 9:16 Individual no próximo slot:**
   ```bash
   python -m src.reddit_pipeline --sub maliciouscompliance
   ```

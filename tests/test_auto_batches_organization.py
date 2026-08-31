@@ -147,5 +147,36 @@ class TestAutoBatchesOrganization(unittest.TestCase):
         self.assertTrue(os.path.exists(badge_path))
         self.assertGreater(os.path.getsize(badge_path), 5000)
 
+    def test_batch_video0_dual_and_video1to9_shorts_policy(self):
+        """Verifica que o lote de 10 slots contem video_0 com subpastas dual e video_1..9 com shorts normais."""
+        mgr = BatchManager(base_dir=self.test_dir, batch_size=10)
+        b1_dir = os.path.join(self.test_dir, "batch_1")
+        
+        # 1. Cria video_0 no formato DUAL
+        v0_dir = os.path.join(b1_dir, "video_0")
+        v0_long = os.path.join(v0_dir, "longform_25min")
+        v0_teaser = os.path.join(v0_dir, "teaser_short")
+        os.makedirs(v0_long, exist_ok=True)
+        os.makedirs(v0_teaser, exist_ok=True)
+        with open(os.path.join(v0_long, "longform_master_25min_16x9.mp4"), "wb") as f:
+            f.write(b"0" * 30000)
+        with open(os.path.join(v0_teaser, "teaser_short_9x16.mp4"), "wb") as f:
+            f.write(b"0" * 30000)
+
+        # 2. Cria video_1 a video_9 com shorts normais
+        for i in range(1, 10):
+            self._create_mock_video_slot(b1_dir, f"video_{i}")
+
+        summary = mgr.get_summary()
+        self.assertEqual(len(summary), 1)
+        self.assertEqual(summary[0]["video_count"], 10)
+        self.assertTrue(summary[0]["is_full"])
+
+        # Proximo deve ser batch_2/video_0
+        next_slot, b_num, v_num = mgr.get_next_video_slot()
+        self.assertEqual(b_num, 2)
+        self.assertEqual(v_num, 0)
+        self.assertTrue(next_slot.endswith(os.path.join("batch_2", "video_0")))
+
 if __name__ == "__main__":
     unittest.main()

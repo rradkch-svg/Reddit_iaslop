@@ -120,22 +120,21 @@ class RedditAutoPipelineRunner:
     """
     Executor mestre autônomo para o Reddit Story Studio.
     Produz lotes contínuos no formato oficial batch_1, batch_2... (10 slots por lote: video_0 a video_9).
-    Cada slot contém subpastas dedicadas:
-    - longform_25min/: Vídeo Master de 25 minutos (16:9 1080p60) + áudio + timestamps
-    - teaser_short/: Teaser Short Vertical (9:16) com gancho final ('See More Here / Full Saga')
+    
+    REGRA OFICIAL DOS LOTES:
+    - video_0: Formato DUAL OBRIGATÓRIO (subpastas 'longform_25min/' e 'teaser_short/')
+    - video_1 a video_9: Shorts normais individuais em alta retenção (9:16 até 2.5 min com CTA)
     """
     def __init__(
         self,
         target_subreddits: Optional[List[str]] = None,
         model_name: str = "gemini-flash-lite-latest",
         output_dir: str = "checkpoint/auto_batches",
-        mode: str = "dual", # "dual", "longform", "shorts"
         batch_size: int = 10
     ):
         self.target_subreddits = target_subreddits or HIGH_CPM_SUBREDDITS
         self.model_name = model_name
         self.output_dir = output_dir
-        self.mode = mode.lower()
         self.batch_size = batch_size
         self.batch_manager = BatchManager(base_dir=output_dir, batch_size=batch_size)
         self.batch_manager.organize_legacy_directories()
@@ -144,9 +143,9 @@ class RedditAutoPipelineRunner:
         print(f"\n=======================================================")
         print(f"🔥 REDDIT STORY STUDIO - MODO AUTÔNOMO POR BATCHES")
         print(f"   Estrutura: batch_1, batch_2... (10 vídeos por lote)")
+        print(f"   Regra: video_0 = Dual (25min Long + Teaser) | video_1..9 = Shorts Normais")
         print(f"   Subreddits: {', '.join(self.target_subreddits)}")
         print(f"   Total a produzir nesta sessão: {count} slots de vídeo")
-        print(f"   Modo de Produção: {self.mode.upper()} (Longform 25min + Teaser Short)")
         print(f"=======================================================\n")
 
         stories = fetch_top_high_cpm_stories(subreddits=self.target_subreddits, max_stories=count * 2)
@@ -162,31 +161,44 @@ class RedditAutoPipelineRunner:
             sub = story.get("subreddit", "reddit")
             title = story.get("title", "")[:45]
             
-            print(f"\n🚀 [{completed+1}/{count}] Produzindo para batch_{batch_num}/video_{video_num} ({sub}): '{title}...'")
+            is_video_0 = (video_num == 0)
 
-            try:
-                teaser_info = None
-                if self.mode in ("dual", "longform"):
+            if is_video_0:
+                print(f"\n🌟 [{completed+1}/{count}] Slot Especial: batch_{batch_num}/video_0 ({sub}) ➔ PRODUZINDO FORMATO DUAL (Longform 25min + Teaser Short)...")
+                try:
+                    # 1. Gera vídeo longo de 25min (16:9) na subpasta longform_25min/
                     res_long = generate_25min_single_story_video(
                         custom_post=story,
                         target_duration_minutes=25.0,
                         custom_output_dir=target_slot
                     )
-                    teaser_info = res_long.get("teaser_short_data")
-                    print(f"✅ [batch_{batch_num} | video_{video_num}] Vídeo Master 25min gerado em: {target_slot}/longform_25min/")
-
-                if self.mode in ("dual", "shorts"):
+                    # 2. Gera teaser short vertical (9:16) na subpasta teaser_short/
                     res_teaser = generate_teaser_short_video(
                         story_raw=story,
                         custom_output_dir=target_slot,
-                        teaser_data=teaser_info
+                        teaser_data=res_long.get("teaser_short_data")
                     )
-                    print(f"✅ [batch_{batch_num} | video_{video_num}] Teaser Short 9:16 gerado em: {target_slot}/teaser_short/")
-
-                completed += 1
-            except Exception as e:
-                print(f"❌ Erro ao produzir história {idx+1}: {e}")
-                time.sleep(2)
+                    print(f"✅ [batch_{batch_num} | video_0] DUAL CONCLUÍDO:")
+                    print(f"   🎬 Longform 25min: {target_slot}/longform_25min/")
+                    print(f"   ⚡ Teaser Short 9:16: {target_slot}/teaser_short/")
+                    completed += 1
+                except Exception as e:
+                    print(f"❌ Erro ao produzir slot dual video_0: {e}")
+                    time.sleep(2)
+            else:
+                print(f"\n🚀 [{completed+1}/{count}] Slot Standard: batch_{batch_num}/video_{video_num} ({sub}) ➔ PRODUZINDO SHORT INDIVIDUAL...")
+                try:
+                    # Gera Short individual clássico diretamente na pasta video_Y/
+                    res_short = run_reddit_story_pipeline(
+                        custom_post=story,
+                        custom_output_dir=target_slot,
+                        model_name=self.model_name
+                    )
+                    print(f"✅ [batch_{batch_num} | video_{video_num}] Short Individual 9:16 gerado em: {target_slot}/")
+                    completed += 1
+                except Exception as e:
+                    print(f"❌ Erro ao produzir short {video_num}: {e}")
+                    time.sleep(2)
 
         print(f"\n🎉 Sessão concluída! Total produzidos: {completed}/{count}")
         self.print_status()
@@ -205,8 +217,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Reddit Story Studio Auto Pipeline")
     parser.add_argument("--count", type=int, default=10, help="Quantidade de vídeos a produzir (padrão: 10)")
     parser.add_argument("--sub", type=str, default=None, help="Subreddit alvo específico")
-    parser.add_argument("--mode", type=str, default="dual", choices=["dual", "longform", "shorts"], help="Modo de produção: dual (25min + Teaser), longform ou shorts")
-    parser.add_argument("--longform", action="store_true", help="Atalho para modo longform de 25 minutos")
     parser.add_argument("--organize", action="store_true", help="Organizar diretórios legados em batch_1/video_0...")
     parser.add_argument("--status", action="store_true", help="Exibir status dos batches organizados")
     args = parser.parse_args()
@@ -229,11 +239,7 @@ if __name__ == "__main__":
         sys.exit(0)
     atexit.register(LOCK_MANAGER.release)
 
-    prod_mode = "longform" if args.longform else args.mode
     subs = [args.sub] if args.sub else None
-    runner = RedditAutoPipelineRunner(
-        target_subreddits=subs,
-        mode=prod_mode
-    )
+    runner = RedditAutoPipelineRunner(target_subreddits=subs)
     runner.run_continuous_batch(count=args.count)
 
