@@ -27,8 +27,16 @@ class CheckpointManager:
     def __init__(self, root_dir: Optional[str] = None, videos_per_batch: int = VIDEOS_PER_BATCH):
         self.root_dir = os.path.abspath(root_dir or DEFAULT_CHECKPOINT_ROOT)
         self.videos_per_batch = videos_per_batch
-        self.blacklist_file = os.path.join(self.root_dir, "blacklist.json")
-        self.blacklist_txt = os.path.join(self.root_dir, "blacklist.txt")
+        
+        # Dual Blacklist files: Pure Shorts vs Long Videos
+        self.blacklist_shorts_file = os.path.join(self.root_dir, "blacklist_shorts.json")
+        self.blacklist_shorts_txt = os.path.join(self.root_dir, "blacklist_shorts.txt")
+        self.blacklist_longform_file = os.path.join(self.root_dir, "blacklist_longform.json")
+        self.blacklist_longform_txt = os.path.join(self.root_dir, "blacklist_longform.txt")
+        
+        # Legacy compatibility aliases (point to shorts by default)
+        self.blacklist_file = self.blacklist_shorts_file
+        self.blacklist_txt = self.blacklist_shorts_txt
         self.global_state_file = os.path.join(self.root_dir, "global_state.json")
         
         # Garante a criação da pasta raiz de checkpoints
@@ -37,43 +45,78 @@ class CheckpointManager:
         self._init_global_state_if_needed()
 
     # =========================================================================
-    # 1. GESTÃO DE BLACKLIST (TEMAS JÁ UTILIZADOS - EVITAR REPETIÇÃO)
+    # 1. GESTÃO DE DUAL BLACKLIST (SHORTS vs LONG VIDEOS)
     # =========================================================================
 
+    def _normalize_video_type(self, video_type: Optional[str]) -> str:
+        """Normaliza a identificação do formato: 'shorts' ou 'longform'."""
+        if not video_type:
+            return "shorts"
+        v = str(video_type).lower().strip()
+        if v in ("long", "longform", "long_video", "long_videos", "25min", "compilation", "saga", "horizontal", "16:9"):
+            return "longform"
+        return "shorts"
+
+    def _get_blacklist_paths(self, video_type: str = "shorts") -> Tuple[str, str, str]:
+        """Retorna (json_file, txt_file, label) correspondente ao formato de vídeo."""
+        v_type = self._normalize_video_type(video_type)
+        if v_type == "longform":
+            return self.blacklist_longform_file, self.blacklist_longform_txt, "Long Videos (16:9 / 25-Min Sagas)"
+        return self.blacklist_shorts_file, self.blacklist_shorts_txt, "Pure Shorts (9:16)"
+
     def _init_blacklist_if_needed(self):
-        """Inicializa arquivos de blacklist caso não existam."""
-        if not os.path.exists(self.blacklist_file):
-            initial_data = {
-                "version": 1,
-                "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "total_items": 0,
-                "items": []
-            }
-            self._save_json_atomic(self.blacklist_file, initial_data)
+        """Inicializa os arquivos das 2 blacklists caso não existam, migrando dados legados se presentes."""
+        legacy_json = os.path.join(self.root_dir, "blacklist.json")
+        legacy_txt = os.path.join(self.root_dir, "blacklist.txt")
 
-        if not os.path.exists(self.blacklist_txt):
-            try:
-                with open(self.blacklist_txt, "w", encoding="utf-8") as f:
-                    f.write("# Blacklist de Temas Automotivos Já Gravados (Evita Repetição)\n")
-                    f.write(f"# Criado em: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            except Exception:
-                pass
+        for v_type in ["shorts", "longform"]:
+            json_file, txt_file, label = self._get_blacklist_paths(v_type)
+            if not os.path.exists(json_file):
+                if v_type == "shorts" and os.path.exists(legacy_json):
+                    try:
+                        shutil.copyfile(legacy_json, json_file)
+                    except Exception:
+                        pass
+                if not os.path.exists(json_file):
+                    initial_data = {
+                        "version": 1,
+                        "format": v_type,
+                        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        "total_items": 0,
+                        "items": []
+                    }
+                    self._save_json_atomic(json_file, initial_data)
 
-    def load_blacklist(self) -> List[Dict[str, Any]]:
-        """Carrega a lista de itens da blacklist."""
+            if not os.path.exists(txt_file):
+                if v_type == "shorts" and os.path.exists(legacy_txt):
+                    try:
+                        shutil.copyfile(legacy_txt, txt_file)
+                    except Exception:
+                        pass
+                if not os.path.exists(txt_file):
+                    try:
+                        with open(txt_file, "w", encoding="utf-8") as f:
+                            f.write(f"# Blacklist de Temas - {label} (Evita Repetição)\n")
+                            f.write(f"# Criado em: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                    except Exception:
+                        pass
+
+    def load_blacklist(self, video_type: str = "shorts") -> List[Dict[str, Any]]:
+        """Carrega a lista de itens da blacklist correspondente ao formato ('shorts' ou 'longform')."""
+        json_file, _, _ = self._get_blacklist_paths(video_type)
         try:
-            if os.path.exists(self.blacklist_file):
-                with open(self.blacklist_file, "r", encoding="utf-8") as f:
+            if os.path.exists(json_file):
+                with open(json_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     return data.get("items", [])
         except Exception as e:
-            app_logger.warning(f"[CheckpointManager] Erro ao carregar blacklist.json: {str(e)}")
+            app_logger.warning(f"[CheckpointManager] Erro ao carregar {os.path.basename(json_file)}: {str(e)}")
         return []
 
-    def get_blacklist_titles(self) -> List[str]:
-        """Retorna apenas os títulos e entidades principais da blacklist."""
-        items = self.load_blacklist()
+    def get_blacklist_titles(self, video_type: str = "shorts") -> List[str]:
+        """Retorna apenas os títulos e entidades principais da blacklist especificada."""
+        items = self.load_blacklist(video_type=video_type)
         titles = []
         for it in items:
             t = it.get("tema") or it.get("core_entity")
@@ -81,15 +124,15 @@ class CheckpointManager:
                 titles.append(t)
         return titles
 
-    def is_in_blacklist(self, candidate_topic: Union[str, Dict[str, Any]], threshold: float = 0.68) -> Tuple[bool, str]:
+    def is_in_blacklist(self, candidate_topic: Union[str, Dict[str, Any]], video_type: str = "shorts", threshold: float = 0.68) -> Tuple[bool, str]:
         """
-        Verifica se um tema proposto é idêntico ou semanticamente/contextualmente duplicado
-        em relação a qualquer vídeo já gravado na blacklist, utilizando o motor heurístico contextual.
+        Verifica se um tema proposto é idêntico ou semanticamente duplicado
+        em relação à blacklist correspondente ao formato de vídeo ('shorts' ou 'longform').
         """
         if not candidate_topic:
             return False, ""
 
-        items = self.load_blacklist()
+        items = self.load_blacklist(video_type=video_type)
         if not items:
             return False, ""
 
@@ -99,22 +142,24 @@ class CheckpointManager:
         )
         return is_dup, reason
 
-    def add_to_blacklist(self, topic_data: Any, batch_name: str, video_name: str) -> bool:
+    def add_to_blacklist(self, topic_data: Any, batch_name: str, video_name: str, video_type: str = "shorts") -> bool:
         """
-        Registra imediatamente um tema na Blacklist para garantir que nunca mais se repita.
+        Registra imediatamente um tema na Blacklist do formato especificado ('shorts' ou 'longform').
         Sanitiza o título para nunca ultrapassar 100 caracteres e remove clichês.
         """
         if isinstance(topic_data, str):
             topic_data = {"tema": topic_data}
-        raw_title = topic_data.get("tema") or topic_data.get("titulo") or ""
+        raw_title = topic_data.get("tema") or topic_data.get("titulo") or topic_data.get("title") or topic_data.get("main_title") or ""
         tema_title = sanitize_and_cap_title(raw_title)
         if not tema_title:
             return False
 
-        # Extrai entidade mecânica canônica
+        # Extrai entidade canônica
         core_entity = topic_data.get("core_entity") or extract_canonical_entity(tema_title)
+        v_norm = self._normalize_video_type(video_type)
+        json_file, txt_file, label = self._get_blacklist_paths(v_norm)
 
-        items = self.load_blacklist()
+        items = self.load_blacklist(video_type=v_norm)
         
         # Evita duplicar no próprio arquivo se já estiver presente
         for it in items:
@@ -124,8 +169,9 @@ class CheckpointManager:
         new_entry = {
             "tema": tema_title,
             "core_entity": core_entity,
-            "hook": topic_data.get("hook", ""),
-            "explicacao_tecnica": topic_data.get("explicacao_tecnica", ""),
+            "format": v_norm,
+            "hook": topic_data.get("hook") or topic_data.get("hook_text") or "",
+            "explicacao_tecnica": topic_data.get("explicacao_tecnica") or topic_data.get("body") or "",
             "batch": batch_name,
             "video": video_name,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -134,102 +180,120 @@ class CheckpointManager:
 
         payload = {
             "version": 1,
+            "format": v_norm,
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "total_items": len(items),
             "items": items
         }
 
-        self._save_json_atomic(self.blacklist_file, payload)
+        self._save_json_atomic(json_file, payload)
 
-        # Atualiza blacklist.txt de forma legível
+        # Atualiza o arquivo txt legível
         try:
-            with open(self.blacklist_txt, "a", encoding="utf-8") as f:
+            with open(txt_file, "a", encoding="utf-8") as f:
                 f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [{batch_name}/{video_name}] {tema_title}\n")
         except Exception as e:
-            app_logger.warning(f"[CheckpointManager] Erro ao gravar blacklist.txt: {str(e)}")
+            app_logger.warning(f"[CheckpointManager] Erro ao gravar {os.path.basename(txt_file)}: {str(e)}")
 
-        app_logger.info(f"[CheckpointManager] Blacklist atualizada com: '{tema_title}' ({batch_name}/{video_name})")
+        app_logger.info(f"[CheckpointManager] Blacklist ({v_norm}) atualizada com: '{tema_title}' ({batch_name}/{video_name})")
         return True
 
-    def remove_from_blacklist(self, keyword: str) -> int:
+    def remove_from_blacklist(self, keyword: str, video_type: Optional[str] = None) -> int:
         """
-        Remove todas as entradas da Blacklist que contenham a palavra-chave no tema ou na entidade.
-        Atualiza atomicamente o blacklist.json e o blacklist.txt.
-        Retorna a quantidade de itens removidos.
+        Remove todas as entradas da(s) Blacklist(s) que contenham a palavra-chave no tema ou na entidade.
+        Se video_type for fornecido ('shorts' ou 'longform'), remove apenas daquele formato.
+        Se video_type for None, remove de ambas as blacklists.
+        Retorna a quantidade total de itens removidos.
         """
-        items = self.load_blacklist()
-        initial_count = len(items)
+        targets = [self._normalize_video_type(video_type)] if video_type else ["shorts", "longform"]
+        total_removed = 0
         kw = keyword.lower().strip()
 
-        filtered_items = [
-            it for it in items
-            if kw not in it.get("tema", "").lower() and kw not in it.get("core_entity", "").lower()
-        ]
+        for v_type in targets:
+            json_file, txt_file, label = self._get_blacklist_paths(v_type)
+            items = self.load_blacklist(video_type=v_type)
+            initial_count = len(items)
 
-        removed_count = initial_count - len(filtered_items)
-        if removed_count > 0:
-            payload = {
-                "version": 1,
-                "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "total_items": len(filtered_items),
-                "items": filtered_items
-            }
-            self._save_json_atomic(self.blacklist_file, payload)
+            filtered_items = [
+                it for it in items
+                if kw not in it.get("tema", "").lower() and kw not in it.get("core_entity", "").lower()
+            ]
 
-            # Reconstrói o blacklist.txt limpo
-            try:
-                with open(self.blacklist_txt, "w", encoding="utf-8") as f:
-                    f.write(f"# Blacklist de Temas Automotivos Já Gravados (Evita Repetição)\n")
-                    f.write(f"# Atualizado em: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-                    for it in filtered_items:
-                        b = it.get("batch", "batch_0")
-                        v = it.get("video", "video_0")
-                        ts = it.get("timestamp", time.strftime('%Y-%m-%d %H:%M:%S')).replace("T", " ")
-                        t = it.get("tema", "")
-                        f.write(f"[{ts}] [{b}/{v}] {t}\n")
-            except Exception as e:
-                app_logger.warning(f"[CheckpointManager] Erro ao regravar blacklist.txt: {str(e)}")
+            removed_count = initial_count - len(filtered_items)
+            if removed_count > 0:
+                total_removed += removed_count
+                payload = {
+                    "version": 1,
+                    "format": v_type,
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "total_items": len(filtered_items),
+                    "items": filtered_items
+                }
+                self._save_json_atomic(json_file, payload)
 
-            app_logger.info(f"[CheckpointManager] {removed_count} item(ns) contendo '{keyword}' removido(s) da blacklist.")
+                # Reconstrói o txt limpo
+                try:
+                    with open(txt_file, "w", encoding="utf-8") as f:
+                        f.write(f"# Blacklist de Temas - {label} (Evita Repetição)\n")
+                        f.write(f"# Atualizado em: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                        for it in filtered_items:
+                            b = it.get("batch", "batch_0")
+                            v = it.get("video", "video_0")
+                            ts = it.get("timestamp", time.strftime('%Y-%m-%d %H:%M:%S')).replace("T", " ")
+                            t = it.get("tema", "")
+                            f.write(f"[{ts}] [{b}/{v}] {t}\n")
+                except Exception as e:
+                    app_logger.warning(f"[CheckpointManager] Erro ao regravar {os.path.basename(txt_file)}: {str(e)}")
 
-        return removed_count
+                app_logger.info(f"[CheckpointManager] {removed_count} item(ns) contendo '{keyword}' removido(s) da blacklist ({v_type}).")
+
+        return total_removed
 
     def purge_batch(self, batch_name: str) -> bool:
         """
         Descarta e desconsidera um batch por completo:
-        1. Remove todas as entradas do batch da Blacklist (json e txt).
+        1. Remove todas as entradas do batch de AMBAS as Blacklists (shorts e longform).
         2. Remove o batch do global_state.json e recalcula total_videos_completed.
         3. Exclui a pasta do batch no disco.
         """
-        # 1. Limpeza da Blacklist
-        items = self.load_blacklist()
-        filtered_items = [it for it in items if it.get("batch") != batch_name]
-        if len(filtered_items) != len(items):
-            payload = {
-                "version": 1,
-                "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "total_items": len(filtered_items),
-                "items": filtered_items
-            }
-            self._save_json_atomic(self.blacklist_file, payload)
-            try:
-                with open(self.blacklist_txt, "w", encoding="utf-8") as f:
-                    f.write(f"# Blacklist de Temas Automotivos Já Gravados (Evita Repetição)\n")
-                    f.write(f"# Atualizado em: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-                    for it in filtered_items:
-                        b = it.get("batch", "batch_0")
-                        v = it.get("video", "video_0")
-                        ts = it.get("timestamp", time.strftime('%Y-%m-%d %H:%M:%S')).replace("T", " ")
-                        t = it.get("tema", "")
-                        f.write(f"[{ts}] [{b}/{v}] {t}\n")
-            except Exception as e:
-                app_logger.warning(f"[CheckpointManager] Erro ao regravar blacklist.txt: {str(e)}")
+        # 1. Limpeza em ambas as Blacklists
+        for v_type in ["shorts", "longform"]:
+            json_file, txt_file, label = self._get_blacklist_paths(v_type)
+            items = self.load_blacklist(video_type=v_type)
+            filtered_items = [it for it in items if it.get("batch") != batch_name]
+            if len(filtered_items) != len(items):
+                payload = {
+                    "version": 1,
+                    "format": v_type,
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "total_items": len(filtered_items),
+                    "items": filtered_items
+                }
+                self._save_json_atomic(json_file, payload)
+                try:
+                    with open(txt_file, "w", encoding="utf-8") as f:
+                        f.write(f"# Blacklist de Temas - {label} (Evita Repetição)\n")
+                        f.write(f"# Atualizado em: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                        for it in filtered_items:
+                            b = it.get("batch", "batch_0")
+                            v = it.get("video", "video_0")
+                            ts = it.get("timestamp", time.strftime('%Y-%m-%d %H:%M:%S')).replace("T", " ")
+                            t = it.get("tema", "")
+                            f.write(f"[{ts}] [{b}/{v}] {t}\n")
+                except Exception as e:
+                    app_logger.warning(f"[CheckpointManager] Erro ao regravar {os.path.basename(txt_file)}: {str(e)}")
 
         # 2. Exclusão física da pasta do batch
         batch_dir = os.path.join(self.root_dir, batch_name)
+        if not os.path.exists(batch_dir):
+            # Tenta dentro de auto_batches/
+            auto_b_dir = os.path.join(self.root_dir, "auto_batches", batch_name)
+            if os.path.exists(auto_b_dir):
+                batch_dir = auto_b_dir
+
         if os.path.exists(batch_dir):
             try:
                 shutil.rmtree(batch_dir)
@@ -605,6 +669,98 @@ class CheckpointManager:
                 except:
                     pass
             raise e
+
+    def sync_blacklists_from_batches(self, base_batches_dir: Optional[str] = None) -> Dict[str, int]:
+        """
+        Varre todos os diretórios de batches no disco (ex: checkpoint/auto_batches/batch_1/video_0..)
+        e sincroniza os temas nas 2 Blacklists isoladas:
+        - video_0 (ou que possua subpasta longform_25min) -> blacklist_longform
+        - video_1..video_9 (ou teaser_short / shorts clássicos) -> blacklist_shorts
+        Retorna a quantidade de itens adicionados em cada blacklist: {'shorts': N, 'longform': M}.
+        """
+        search_dirs = []
+        if base_batches_dir and os.path.exists(base_batches_dir):
+            search_dirs.append(base_batches_dir)
+        auto_dir = os.path.join(self.root_dir, "auto_batches")
+        if os.path.exists(auto_dir) and auto_dir not in search_dirs:
+            search_dirs.append(auto_dir)
+        if self.root_dir not in search_dirs:
+            search_dirs.append(self.root_dir)
+
+        shorts_added = 0
+        longform_added = 0
+
+        for base_p in search_dirs:
+            if not os.path.exists(base_p):
+                continue
+            for b_name in os.listdir(base_p):
+                b_path = os.path.join(base_p, b_name)
+                if not os.path.isdir(b_path) or not re.match(r"^batch_\d+$", b_name, re.IGNORECASE):
+                    continue
+
+                for v_name in os.listdir(b_path):
+                    v_path = os.path.join(b_path, v_name)
+                    if not os.path.isdir(v_path) or not re.match(r"^video_\d+$", v_name, re.IGNORECASE):
+                        continue
+
+                    # Determina se é slot de Longform ou Short
+                    m = re.match(r"^video_(\d+)$", v_name, re.IGNORECASE)
+                    v_num = int(m.group(1)) if m else -1
+                    is_longform = (v_num == 0) or os.path.exists(os.path.join(v_path, "longform_25min"))
+
+                    # Tenta ler script_data.json
+                    script_candidates = [
+                        os.path.join(v_path, "longform_25min", "script_data.json"),
+                        os.path.join(v_path, "script_data.json"),
+                        os.path.join(v_path, "teaser_short", "script_data.json")
+                    ] if is_longform else [
+                        os.path.join(v_path, "script_data.json")
+                    ]
+
+                    story_data = None
+                    for sc_file in script_candidates:
+                        if os.path.exists(sc_file):
+                            try:
+                                with open(sc_file, "r", encoding="utf-8") as f:
+                                    story_data = json.load(f)
+                                if story_data:
+                                    break
+                            except Exception:
+                                pass
+
+                    # Fallback: metadata.txt
+                    if not story_data:
+                        meta_candidates = [
+                            os.path.join(v_path, "metadata.txt"),
+                            os.path.join(v_path, "longform_25min", "metadata.txt")
+                        ]
+                        for mf in meta_candidates:
+                            if os.path.exists(mf):
+                                try:
+                                    with open(mf, "r", encoding="utf-8") as f:
+                                        lines = f.readlines()
+                                    title_line = [l.replace("TITULO:", "").replace("TITLE:", "").strip() for l in lines if l.startswith("TITULO:") or l.startswith("TITLE:")]
+                                    if title_line:
+                                        story_data = {"tema": title_line[0]}
+                                        break
+                                except Exception:
+                                    pass
+
+                    if story_data:
+                        v_type = "longform" if is_longform else "shorts"
+                        raw_title = story_data.get("tema") or story_data.get("title") or story_data.get("titulo") or story_data.get("main_title") or ""
+                        if raw_title:
+                            ex_titles = self.get_blacklist_titles(video_type=v_type)
+                            sanitized = sanitize_and_cap_title(raw_title)
+                            if sanitized and sanitized not in ex_titles:
+                                if self.add_to_blacklist(story_data, batch_name=b_name, video_name=v_name, video_type=v_type):
+                                    if is_longform:
+                                        longform_added += 1
+                                    else:
+                                        shorts_added += 1
+
+        app_logger.info(f"[CheckpointManager] Sincronização de Batches concluída: +{shorts_added} Shorts, +{longform_added} Longform.")
+        return {"shorts_synced": shorts_added, "longform_synced": longform_added}
 
 # Instância singleton padrão
 DEFAULT_CHECKPOINT_MANAGER = CheckpointManager()

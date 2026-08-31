@@ -14,6 +14,7 @@ try:
     from .reddit_subtitles import generate_reddit_ass_subtitles
     from .reddit_render import render_reddit_story_video, find_ffmpeg_binary
     from .batch_manager import BatchManager
+    from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
 except ImportError:
     from logger import app_logger, LogSpan
     from reddit_scraper import fetch_top_high_cpm_stories
@@ -23,6 +24,7 @@ except ImportError:
     from reddit_subtitles import generate_reddit_ass_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary
     from batch_manager import BatchManager
+    from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
 
 def run_reddit_story_pipeline(
     target_subreddit: Optional[str] = None,
@@ -179,6 +181,19 @@ DETALHES DE PRODUÇÃO:
 
         if status_callback:
             status_callback("🎉 Produção concluída com sucesso! Todos os masters gerados.")
+
+        # Registra o tema na Blacklist de Shorts
+        try:
+            b_name = os.path.basename(os.path.dirname(video_dir)) if "batch_" in video_dir else "manual_batch"
+            v_name = os.path.basename(video_dir) if "video_" in video_dir else "video_short"
+            DEFAULT_CHECKPOINT_MANAGER.add_to_blacklist(
+                topic_data=script_data,
+                batch_name=b_name,
+                video_name=v_name,
+                video_type="shorts"
+            )
+        except Exception as e:
+            app_logger.warning(f"[Pipeline] Erro ao registrar em blacklist_shorts: {str(e)}")
 
         return {
             "success": True,

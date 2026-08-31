@@ -15,6 +15,7 @@ try:
     from .reddit_subtitles import generate_reddit_ass_subtitles
     from .reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from .batch_manager import BatchManager
+    from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
 except ImportError:
     from logger import app_logger, LogSpan
     from reddit_scraper import EXPANDED_HIGH_CPM_STORIES, fetch_top_high_cpm_stories
@@ -24,6 +25,7 @@ except ImportError:
     from reddit_subtitles import generate_reddit_ass_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from batch_manager import BatchManager
+    from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
 
 def generate_25min_single_story_video(
     target_subreddit: Optional[str] = None,
@@ -258,6 +260,23 @@ HASHTAGS:
 
         if status_callback:
             status_callback(f"🎉 Vídeo de História Única de {total_story_duration/60:.1f} minutos gerado com sucesso!")
+
+        # Registra o tema na Blacklist de Long Videos
+        try:
+            b_name = os.path.basename(os.path.dirname(work_dir)) if "batch_" in work_dir else "manual_batch"
+            v_name = os.path.basename(work_dir) if "video_" in work_dir else "video_0"
+            DEFAULT_CHECKPOINT_MANAGER.add_to_blacklist(
+                topic_data={
+                    "tema": longform_data.get("main_title", story_raw.get("title", "")),
+                    "hook": longform_data.get("opening_hook", ""),
+                    "explicacao_tecnica": story_raw.get("body", "")
+                },
+                batch_name=b_name,
+                video_name=v_name,
+                video_type="longform"
+            )
+        except Exception as e:
+            app_logger.warning(f"[Longform25Min] Erro ao registrar em blacklist_longform: {str(e)}")
 
         return {
             "success": True,

@@ -38,6 +38,7 @@ try:
     from .reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
     from .reddit_longform import generate_25min_single_story_video
     from .batch_manager import BatchManager
+    from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
 except ImportError:
     from gemini_client import (
         resolve_gemini_api_keys,
@@ -59,6 +60,7 @@ except ImportError:
     from reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
     from reddit_longform import generate_25min_single_story_video
     from batch_manager import BatchManager
+    from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
 
 st.set_page_config(
     page_title="Reddit Story Studio - High CPM Video Generator",
@@ -142,9 +144,10 @@ st.markdown('<div class="main-header">🔥 Reddit Story Studio — Alto CPM (Sho
 st.markdown('<div class="sub-header">Produção automatizada de vídeos virais do Reddit com Cards Oficiais em alta resolução, gameplay HD 1080p60, narração neural por persona e legendas dinâmicas Hormozi.</div>', unsafe_allow_html=True)
 
 # Tabs Principais
-tab_shorts, tab_longform, tab_scraper, tab_visuals, tab_voice, tab_gallery = st.tabs([
+tab_shorts, tab_longform, tab_blacklist, tab_scraper, tab_visuals, tab_voice, tab_gallery = st.tabs([
     "📱 Shorts (até 2.5 min + CTA)",
     "🎬 História Única (25 Minutos)",
+    "🛡️ Dual Blacklists",
     "📡 Explorador do Reddit",
     "🎨 Cards do Reddit & Gameplay HD",
     "🎙️ Laboratório de Vozes",
@@ -181,6 +184,11 @@ with tab_shorts:
                 "score": cust_score,
                 "body": cust_body
             }
+            is_dup, reason = DEFAULT_CHECKPOINT_MANAGER.is_in_blacklist(custom_post_obj, video_type="shorts")
+            if is_dup:
+                st.warning(f"⚠️ **Atenção:** Este tema já consta na **Blacklist de Shorts**: {reason}")
+            else:
+                st.success("✅ **Tema inédito para Shorts!**")
 
     if st.button("🚀 Gerar Short 9:16 (até 2.5 min)", type="primary", use_container_width=True):
         status_box = st.empty()
@@ -224,9 +232,30 @@ with tab_longform:
             key="lf_sub_select"
         )
         target_mins = st.slider("Duração Alvo (Minutos):", min_value=20.0, max_value=30.0, value=25.0, step=1.0)
+        use_custom_lf = st.checkbox("✍️ Inserir História Customizada para Longform", key="use_custom_lf")
     with col_lf2:
         gen_teaser_check = st.checkbox("⚡ Gerar também o Teaser Short 9:16 (com Gancho Final)", value=True)
         st.caption("Cria simultaneamente o clipe vertical promocional com badge '👉 FULL 25-MIN SAGA ON CHANNEL' e CTA de tela.")
+
+    custom_lf_obj = None
+    if use_custom_lf:
+        cust_lf_title = st.text_input("Título da História Longform:", value="Strict executive banned working from home for IT team...")
+        cust_lf_author = st.text_input("Autor (Reddit):", value="u/SysAdminHero", key="cust_lf_author")
+        cust_lf_score = st.text_input("Upvotes:", value="36.8k", key="cust_lf_score")
+        cust_lf_body = st.text_area("Texto Completo da História:", height=180, key="cust_lf_body")
+        if cust_lf_title and cust_lf_body:
+            custom_lf_obj = {
+                "subreddit": f"r/{lf_sub}",
+                "title": cust_lf_title,
+                "author": cust_lf_author,
+                "score": cust_lf_score,
+                "body": cust_lf_body
+            }
+            is_dup_lf, reason_lf = DEFAULT_CHECKPOINT_MANAGER.is_in_blacklist(custom_lf_obj, video_type="longform")
+            if is_dup_lf:
+                st.warning(f"⚠️ **Atenção:** Este tema já consta na **Blacklist de Long Videos**: {reason_lf}")
+            else:
+                st.success("✅ **Tema inédito para Long Videos!**")
 
     if st.button("🚀 Produzir Vídeo Épico de 25 Minutos (História Única)", type="primary", use_container_width=True):
         status_lf = st.empty()
@@ -240,6 +269,7 @@ with tab_longform:
             prog_lf.progress(15)
             res_lf = generate_25min_single_story_video(
                 target_subreddit=lf_sub,
+                custom_post=custom_lf_obj,
                 target_duration_minutes=target_mins,
                 status_callback=cb_lf
             )
@@ -280,7 +310,69 @@ with tab_longform:
             status_lf.error(f"Erro na produção do vídeo longo: {str(e)}")
 
 # -------------------------------------------------------------
-# TAB 3: EXPLORADOR DO REDDIT (LIVE SCRAPER)
+# TAB 3: DUAL BLACKLISTS (SHORTS & LONG VIDEOS)
+# -------------------------------------------------------------
+with tab_blacklist:
+    st.markdown("### 🛡️ Gestão de Dual Blacklists (Prevenção de Repetição)")
+    st.caption("Controle isolado de temas já produzidos para Pure Shorts (9:16) e Long Videos (16:9 / 25-Min Sagas).")
+
+    bl_format = st.radio(
+        "Selecione o formato para gerenciar:",
+        ["📱 Pure Shorts (blacklist_shorts)", "🎬 Long Videos (blacklist_longform)"],
+        horizontal=True
+    )
+    v_type_selected = "shorts" if "Shorts" in bl_format else "longform"
+    items = DEFAULT_CHECKPOINT_MANAGER.load_blacklist(video_type=v_type_selected)
+    paths = DEFAULT_CHECKPOINT_MANAGER._get_blacklist_paths(video_type=v_type_selected)
+
+    st.markdown(f"**Arquivo:** `{os.path.relpath(paths[0], PROJECT_ROOT)}` • **Total de Temas Cadastrados:** `{len(items)}`")
+
+    col_bl1, col_bl2 = st.columns([2, 1])
+    with col_bl1:
+        search_kw = st.text_input("🔍 Pesquisar na blacklist ativa:", placeholder="Ex: boss, overtime, landlord...")
+    with col_bl2:
+        st.write("")
+        st.write("")
+        if st.button("🔄 Sincronizar Batches do Disco", use_container_width=True):
+            res_sync = DEFAULT_CHECKPOINT_MANAGER.sync_blacklists_from_batches()
+            st.success(f"Sincronização concluída! (+{res_sync['shorts_synced']} Shorts, +{res_sync['longform_synced']} Longform)")
+            st.rerun()
+
+    # Filtra itens
+    if search_kw:
+        filtered_items = [it for it in items if search_kw.lower() in it.get("tema", "").lower() or search_kw.lower() in it.get("core_entity", "").lower()]
+    else:
+        filtered_items = items
+
+    if filtered_items:
+        st.markdown(f"#### 📋 Itens Registrados ({len(filtered_items)}):")
+        for it in reversed(filtered_items):
+            with st.expander(f"📌 [{it.get('batch', 'batch_0')}/{it.get('video', 'video_0')}] {it.get('tema', 'Sem título')}"):
+                st.markdown(f"- **Entidade Principal:** `{it.get('core_entity', '-')}`")
+                st.markdown(f"- **Data de Registro:** `{it.get('timestamp', '-')}`")
+                if it.get("hook"):
+                    st.markdown(f"- **Gancho (Hook):** {it.get('hook')}")
+    else:
+        st.info("Nenhum item registrado nesta blacklist.")
+
+    st.markdown("---")
+    st.markdown("#### 🗑️ Exclusão / Limpeza de Temas")
+    col_del1, col_del2 = st.columns([3, 1])
+    with col_del1:
+        del_kw = st.text_input("Palavra-chave a remover da blacklist ativa:", placeholder="Ex: landlord")
+    with col_del2:
+        st.write("")
+        st.write("")
+        if st.button("🗑️ Remover da Blacklist", type="secondary", use_container_width=True):
+            if del_kw:
+                n_rem = DEFAULT_CHECKPOINT_MANAGER.remove_from_blacklist(keyword=del_kw, video_type=v_type_selected)
+                st.success(f"{n_rem} item(ns) removido(s) com sucesso!")
+                st.rerun()
+            else:
+                st.warning("Informe uma palavra-chave para remover.")
+
+# -------------------------------------------------------------
+# TAB 4: EXPLORADOR DO REDDIT (LIVE SCRAPER)
 # -------------------------------------------------------------
 with tab_scraper:
     st.markdown("### 📡 Raspador em Tempo Real de Subreddits de Alto CPM")
@@ -302,7 +394,7 @@ with tab_scraper:
                 st.markdown(f"[Ver post original]({p.get('url', '#')})")
 
 # -------------------------------------------------------------
-# TAB 4: CARDS DO REDDIT & GAMEPLAY HD
+# TAB 5: CARDS DO REDDIT & GAMEPLAY HD
 # -------------------------------------------------------------
 with tab_visuals:
     st.markdown("### 🎨 Pré-visualização de Cards Oficiais do Reddit")
@@ -341,7 +433,7 @@ with tab_visuals:
         st.warning("Nenhum vídeo em assets/backgrounds. Clique em 'Baixar Novos Backgrounds' na barra lateral.")
 
 # -------------------------------------------------------------
-# TAB 5: LABORATÓRIO DE VOZES
+# TAB 6: LABORATÓRIO DE VOZES
 # -------------------------------------------------------------
 with tab_voice:
     st.markdown("### 🎙️ Teste de Personas Vocais Neurais")
@@ -360,7 +452,7 @@ with tab_voice:
                 st.audio(test_mp3)
 
 # -------------------------------------------------------------
-# TAB 6: GALERIA DE MASTERS & BATCHES
+# TAB 7: GALERIA DE MASTERS & BATCHES
 # -------------------------------------------------------------
 with tab_gallery:
     st.markdown("### 📁 Galeria de Lotes (batch_1, batch_2...) & Vídeos")
