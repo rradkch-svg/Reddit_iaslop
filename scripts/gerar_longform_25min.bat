@@ -20,6 +20,6 @@ python -m src.reddit_longform %*
 
 echo.
 echo =========================================================================
-echo  PRODUCAO CONCLUIDA! Verifique os arquivos em checkpoint/reddit_longform_25min/
+echo  PRODUCAO CONCLUIDA! Verifique os arquivos em checkpoint/auto_batches/ (batch_1, batch_2...)
 echo =========================================================================
 pause

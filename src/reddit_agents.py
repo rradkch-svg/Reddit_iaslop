@@ -21,12 +21,12 @@ PERSONA_VOICE_MAP = {
 }
 
 ENGAGEMENT_QUESTIONS = [
-    "What would you have done in my situation? Drop your thoughts in the comments below.",
-    "Did I take the revenge too far, or was it completely justified? Tell me your verdict in the comments.",
-    "Have you ever had to deal with an entitled boss or neighbor like this? Share your story below!",
-    "Who was in the wrong here? Let me know what you think in the comments.",
-    "Would you have followed their orders to the letter, or walked away? Drop a comment below!",
-    "If you were in my shoes, what would your next move be? Let's discuss in the comments."
+    "Now that you've heard how this all played out, I want to hear from you: what would you have done in my situation? Drop your thoughts in the comments below.",
+    "Looking back at the entire situation: did I take things too far, or was it completely justified? Tell me your verdict in the comments below.",
+    "And that was the final fallout. Have you ever had to deal with an entitled boss or neighbor like this? Share your story in the comments below!",
+    "So now that you know the whole story: who do you think was truly in the wrong here? Let me know your thoughts in the comments below.",
+    "Looking back at everything: would you have followed their orders to the letter, or walked away? Drop your take in the comments below!",
+    "And with all of that said, I'm curious: if you were in my shoes, what would your next move have been? Let's discuss in the comments below."
 ]
 
 class RedditStoryDirectorAgent:
@@ -51,7 +51,7 @@ class RedditStoryDirectorAgent:
             "2. PACING & WORD CHOICE: Write in active, punchy conversational English. Cut all useless fluff, throat-clearing, or Reddit acronym explanations. Focus on the conflict, the petty demands, the genius compliance, and the catastrophic fallout.\n"
             "3. PERSONA IDENTIFICATION: Detect whether the original narrator is male, female, or neutral, and pick the best persona ('male_dramatic', 'female_expressive', 'male_casual', 'young_fast').\n"
             "4. SHORTS DURATION (UP TO 2.5 MINUTES): 'shorts_script' must be between 300 to 450 words (approx. 2.0 to 2.5 minutes spoken at 1.20x speed). It must tell the complete arc and conclude with a punchline.\n"
-            "5. MANDATORY AUDIENCE ENGAGEMENT CTA: The very last sentence of 'shorts_script' MUST ask a provocative, high-engagement question to the audience to prompt comments and debate.\n"
+            "5. SEAMLESS OUTRO & ENGAGEMENT CTA (MANDATORY): Conclude the story resolution cleanly, then smoothly bridge into the audience question using a natural conversational segue (e.g., 'Now looking back at how this all played out, I have to ask: what would you have done in my situation? Drop your thoughts in the comments below.'). Never make the final CTA feel like an abrupt cut or disjointed break.\n"
             "6. LONG-FORM SCRIPT: 'longform_script' must be an extended, rich narrative (600 to 1000 words).\n\n"
             "OUTPUT JSON SCHEMA:\n"
             "{\n"
@@ -59,13 +59,12 @@ class RedditStoryDirectorAgent:
             "  \"persona\": \"male_dramatic | female_expressive | male_casual | young_fast\",\n"
             "  \"recommended_voice\": \"en-US-ChristopherNeural | en-US-JennyNeural | en-US-GuyNeural | en-US-EricNeural\",\n"
             "  \"hook_text\": \"Explosive opening sentence\",\n"
-            "  \"shorts_script\": \"Full spoken narration for vertical Short (300-450 words, ending with engagement question)\",\n"
+            "  \"shorts_script\": \"Full spoken narration for vertical Short (300-450 words, smoothly ending with engagement question)\",\n"
             "  \"longform_script\": \"Extended full narration for long-form video (600-1000 words)\",\n"
             "  \"youtube_description\": \"Complete YouTube description with hook, summary, and subscribe CTA\",\n"
             "  \"tags\": [\"#RedditStories\", \"#MaliciousCompliance\", \"#Shorts\", ...],\n"
             "  \"ui_card\": {\n"
-            "      \"subreddit\": \"r/maliciouscompliance\",\n"
-            "      \"author\": \"u/username\",\n"
+            "      \"channel_name\": \"Reddit Minute\",\n"
             "      \"score\": \"24.8k\",\n"
             "      \"display_title\": \"Clean punchy title for Reddit card overlay\"\n"
             "  }\n"
@@ -73,7 +72,7 @@ class RedditStoryDirectorAgent:
         )
 
     def _generate_algorithmic_fallback_script(self, raw_post: Dict[str, Any]) -> Dict[str, Any]:
-        """Gera um roteiro algorítmico contextual de alta retenção com suporte a até 2.5 minutos e CTA de engajamento."""
+        """Gera um roteiro algorítmico contextual de alta retenção com suporte a até 2.5 minutos e transição fluida para o CTA."""
         title = raw_post.get("title", "Insane Reddit Story").strip()
         body = raw_post.get("body", "").strip()
         subreddit = raw_post.get("subreddit", "r/maliciouscompliance").strip()
@@ -89,15 +88,28 @@ class RedditStoryDirectorAgent:
 
         cta = random.choice(ENGAGEMENT_QUESTIONS)
 
-        # Constrói o roteiro do short (até 2.5 minutos: ~350-420 palavras)
-        words_collected = hook.split()
-        for p in paragraphs:
-            words_collected.extend(p.split())
-            if len(words_collected) >= 380:
-                break
+        # Quebra em sentenças completas para nunca truncar no meio de uma frase
+        full_text = f"{hook} " + " ".join(paragraphs)
+        sentences = re.split(r'(?<=[.!?])\s+', full_text)
         
-        core_text = " ".join(words_collected[:380])
-        shorts_narration = f"{core_text} {cta}"
+        collected_sentences = []
+        word_count = 0
+        
+        for s in sentences:
+            s_clean = s.strip()
+            if not s_clean:
+                continue
+            s_words = len(s_clean.split())
+            if (word_count + s_words > 360) and word_count >= 200:
+                break
+            collected_sentences.append(s_clean)
+            word_count += s_words
+        
+        if not collected_sentences:
+            collected_sentences = [hook]
+
+        core_story = " ".join(collected_sentences).rstrip(".!? ")
+        shorts_narration = f"{core_story}. {cta}"
 
         persona = "male_dramatic"
         body_lower = body.lower()
@@ -107,7 +119,10 @@ class RedditStoryDirectorAgent:
             persona = "male_casual"
 
         clean_sub_tag = "#" + re.sub(r"[^\w]", "", subreddit)
-        tags = ["#RedditStories", clean_sub_tag, "#WorkplaceDrama", "#Shorts", "#ViralStory", "#Storytime"]
+        tags = ["#RedditStories", clean_sub_tag, "#WorkplaceDrama", "#Shorts", "#ViralStory", "#Storytime", "#RedditMinute"]
+
+        clean_body = body.rstrip(".!? ")
+        longform_narration = f"{hook} {clean_body}. {cta}"
 
         return {
             "title": title[:85],
@@ -115,17 +130,16 @@ class RedditStoryDirectorAgent:
             "recommended_voice": PERSONA_VOICE_MAP[persona],
             "hook_text": hook,
             "shorts_script": shorts_narration,
-            "longform_script": f"{hook} {body} {cta}",
+            "longform_script": longform_narration,
             "youtube_description": (
                 f"🔥 {title}\n\n"
-                f"A viral story from {subreddit} by {author}.\n\n"
+                f"{hook}\n\n"
                 f"💬 {cta}\n"
-                f"🔔 Subscribe to Reddit Story Studio for the highest-stakes stories every day!"
+                f"🔔 Subscribe to Reddit Minute for the highest-stakes stories every day!"
             ),
             "tags": tags,
             "ui_card": {
-                "subreddit": subreddit,
-                "author": author,
+                "channel_name": "Reddit Minute",
                 "score": score,
                 "display_title": title
             }
@@ -167,10 +181,11 @@ class RedditStoryDirectorAgent:
                     data["recommended_voice"] = PERSONA_VOICE_MAP.get(persona, "en-US-ChristopherNeural")
                 
                 # Garante que o final do shorts tenha uma pergunta para engajar se não houver
-                shorts_txt = data.get("shorts_script", "")
-                if not any(q in shorts_txt[-120:] for q in ["?", "comment", "thoughts", "verdict", "below", "opinion"]):
+                shorts_txt = data.get("shorts_script", "").strip()
+                if not any(q in shorts_txt[-150:] for q in ["?", "comment", "thoughts", "verdict", "below", "opinion", "what would you"]):
                     cta = random.choice(ENGAGEMENT_QUESTIONS)
-                    data["shorts_script"] = f"{shorts_txt.rstrip('. ')}. {cta}"
+                    clean_core = shorts_txt.rstrip(".!? ")
+                    data["shorts_script"] = f"{clean_core}. {cta}"
 
                 return data
             except Exception as e:
@@ -258,6 +273,24 @@ class RedditStoryDirectorAgent:
             api_keys=self.api_keys
         )
         data = json.loads(raw_text)
+        chapters = data.get("chapters", [])
+        if not isinstance(chapters, list) or len(chapters) < 8:
+            return self._generate_algorithmic_25min_story(raw_post, target_minutes)
+
+        # Garante que cada capítulo cumpra o rigor de duração para 25 minutos (total >= 3500 palavras)
+        for i, ch in enumerate(chapters):
+            ch_text = ch.get("narration_text", "").strip()
+            ch_words = ch_text.split()
+            if len(ch_words) < 450:
+                pad_text = (
+                    "Every single memo, timestamp, and communication was documented meticulously to ensure total accountability. "
+                    "The operational implications escalated rapidly as each stage of the directive was executed to the letter. "
+                    "Leadership remained oblivious to the cascading consequences while the financial costs mounted continuously."
+                )
+                while len(ch_words) < 460:
+                    ch_words.extend(pad_text.split())
+                ch["narration_text"] = " ".join(ch_words[:480])
+
         return data
 
     def _generate_algorithmic_25min_story(
@@ -351,10 +384,10 @@ class RedditStoryDirectorAgent:
             while len(words) < 480:
                 words.extend("Every single memo, signature, and timestamp proved beyond a shadow of a doubt that following their orders to the exact letter was the catalyst for the entire forty-two thousand dollar disaster.".split())
             
-            final_chapter_text = " ".join(words[:500])
+            final_chapter_text = " ".join(words[:500]).rstrip(".!? ")
             if num == 8:
                 cta = random.choice(ENGAGEMENT_QUESTIONS)
-                final_chapter_text += f" {cta}"
+                final_chapter_text += f". {cta}"
 
             chapters.append({
                 "chapter_num": num,
@@ -369,11 +402,11 @@ class RedditStoryDirectorAgent:
             "recommended_voice": voice,
             "youtube_description": (
                 f"🔥 {title}\n\n"
-                f"A complete 25-minute deep dive into one of the most insane stories from {subreddit} by {author}.\n\n"
+                f"A complete 25-minute deep dive into one of the most insane Reddit stories.\n\n"
                 f"⏱️ Chapters:\n"
                 + "\n".join([f"- Part {c['chapter_num']}: {c['chapter_title']}" for c in chapters])
-                + f"\n\n💬 What would you have done? Leave a comment below!\n🔔 Subscribe for daily full-length Reddit stories!"
+                + f"\n\n💬 What would you have done? Leave a comment below!\n🔔 Subscribe to Reddit Minute for daily full-length Reddit stories!"
             ),
-            "tags": ["#RedditStories", "#MaliciousCompliance", "#WorkplaceDrama", "#25MinStory", "#Documentary", "#Longform"],
+            "tags": ["#RedditStories", "#MaliciousCompliance", "#WorkplaceDrama", "#25MinStory", "#Documentary", "#Longform", "#RedditMinute"],
             "chapters": chapters
         }

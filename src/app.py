@@ -39,6 +39,7 @@ try:
     from .reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from .reddit_pipeline import run_reddit_story_pipeline
     from .reddit_longform import generate_25min_single_story_video
+    from .batch_manager import BatchManager
 except ImportError:
     from gemini_client import (
         resolve_gemini_api_keys,
@@ -59,6 +60,7 @@ except ImportError:
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from reddit_pipeline import run_reddit_story_pipeline
     from reddit_longform import generate_25min_single_story_video
+    from batch_manager import BatchManager
 
 st.set_page_config(
     page_title="Reddit Story Studio - High CPM Video Generator",
@@ -283,8 +285,8 @@ with tab_visuals:
     st.markdown("### 🎨 Pré-visualização de Cards Oficiais do Reddit")
     col_c1, col_c2 = st.columns([1, 1])
     with col_c1:
-        card_sub = st.text_input("Subreddit:", value="r/maliciouscompliance")
-        card_auth = st.text_input("Autor:", value="u/JusticeServed")
+        card_channel = st.text_input("Nome do Canal:", value="Reddit Minute")
+        card_icon = st.text_input("Caminho do Ícone:", value=r"C:\Users\Aluno\Downloads\icon.jpg")
         card_sc = st.text_input("Score (Upvotes):", value="42.8k")
         card_tit = st.text_input("Título do Card:", value="Boss told me to strictly follow protocol. It cost them $42k.")
         card_aspect = st.selectbox("Proporção:", ["9:16 (Shorts)", "16:9 (Long-form)"])
@@ -294,8 +296,8 @@ with tab_visuals:
     preview_png = os.path.join(PROJECT_ROOT, "checkpoint", f"preview_card_{ratio_str.replace(':', 'x')}.png")
     
     card_data = {
-        "subreddit": card_sub,
-        "author": card_auth,
+        "channel_name": card_channel,
+        "icon_path": card_icon,
         "score": card_sc,
         "display_title": card_tit
     }
@@ -335,16 +337,34 @@ with tab_voice:
                 st.audio(test_mp3)
 
 # -------------------------------------------------------------
-# TAB 6: GALERIA DE MASTERS
+# TAB 6: GALERIA DE MASTERS & BATCHES
 # -------------------------------------------------------------
 with tab_gallery:
-    st.markdown("### 📁 Galeria de Vídeos Prontos para Publicação")
+    st.markdown("### 📁 Galeria de Lotes (batch_1, batch_2...) & Vídeos")
+    
+    # Resumo dos Batches Organizados
+    bm = BatchManager(base_dir=os.path.join(PROJECT_ROOT, "checkpoint", "auto_batches"))
+    summary = bm.get_summary()
+    if summary:
+        st.markdown("#### 📊 Status dos Lotes Ativos:")
+        cols = st.columns(min(max(len(summary), 1), 4))
+        for idx, b_info in enumerate(summary):
+            with cols[idx % len(cols)]:
+                status_lbl = "Completo (10/10)" if b_info["is_full"] else f"{b_info['video_count']}/10 vídeos"
+                st.metric(
+                    label=f"📁 {b_info['batch_name']}",
+                    value=status_lbl,
+                    delta="Cheio" if b_info["is_full"] else f"{10 - b_info['video_count']} vagas"
+                )
+        st.markdown("---")
+
     rendered_videos = glob.glob(os.path.join(PROJECT_ROOT, "checkpoint", "**", "*.mp4"), recursive=True)
     if rendered_videos:
         for vid in rendered_videos:
             if "chapter" not in os.path.basename(vid) and "part_" not in os.path.basename(vid) and "test" not in os.path.basename(vid):
-                st.markdown(f"#### 🎬 `{os.path.basename(vid)}`")
-                st.caption(f"Caminho: `{vid}`")
+                rel_path = os.path.relpath(vid, PROJECT_ROOT)
+                st.markdown(f"#### 🎬 `{rel_path}`")
+                st.caption(f"Arquivo: `{vid}`")
                 st.video(vid)
                 st.markdown("---")
     else:

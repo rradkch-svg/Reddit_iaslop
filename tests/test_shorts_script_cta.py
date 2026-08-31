@@ -7,21 +7,30 @@ class TestShortsScriptCTA(unittest.TestCase):
         """
         Verifica que os roteiros de Shorts:
         1. Suportam duração de até 2.5 minutos (~200 a 450 palavras);
-        2. Contêm obrigatoriamente pergunta/CTA de engajamento no final.
+        2. Contêm obrigatoriamente transição fluida e pergunta/CTA de engajamento no final;
+        3. Terminam em pontuação válida sem corte abrupto de frases no meio.
         """
         director = RedditStoryDirectorAgent()
-        story = EXPANDED_HIGH_CPM_STORIES[0]
         
-        script_data = director._generate_algorithmic_fallback_script(story)
-        shorts_text = script_data.get("shorts_script", "")
-        
-        word_count = len(shorts_text.split())
-        self.assertGreaterEqual(word_count, 200)
-        self.assertLessEqual(word_count, 450)
+        for story in EXPANDED_HIGH_CPM_STORIES[:3]:
+            script_data = director._generate_algorithmic_fallback_script(story)
+            shorts_text = script_data.get("shorts_script", "").strip()
+            
+            word_count = len(shorts_text.split())
+            self.assertGreaterEqual(word_count, 200)
+            self.assertLessEqual(word_count, 450)
 
-        last_150_chars = shorts_text[-150:]
-        has_cta = any(token in last_150_chars.lower() for token in ["?", "comment", "thoughts", "verdict", "below", "opinion", "what would you"])
-        self.assertTrue(has_cta, f"Roteiro de Short sem CTA de engajamento no final: {last_150_chars}")
+            # Valida pontuação final
+            self.assertTrue(shorts_text.endswith((".", "!", "?")), f"Roteiro termina sem pontuação válida: {shorts_text[-40:]}")
+
+            # Valida presença de CTA fluido
+            last_200_chars = shorts_text[-200:].lower()
+            has_cta = any(token in last_200_chars for token in ["?", "comment", "thoughts", "verdict", "below", "opinion", "what would you", "share your story", "discuss"])
+            self.assertTrue(has_cta, f"Roteiro de Short sem CTA de engajamento no final: {last_200_chars}")
+
+            # Valida que ui_card usa 'Reddit Minute'
+            ui_card = script_data.get("ui_card", {})
+            self.assertEqual(ui_card.get("channel_name"), "Reddit Minute")
 
 if __name__ == "__main__":
     unittest.main()

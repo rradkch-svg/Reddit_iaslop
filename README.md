@@ -54,7 +54,12 @@ automotive-slop/
 ├── assets/                      # Recursos visuais e vídeos de fundo
 │   └── backgrounds/             # Vídeos de gameplay 1080p60 HD
 │
-└── checkpoint/                  # Checkpoints e vídeos masters gerados
+├── checkpoint/                  # Checkpoints e vídeos masters gerados
+│   └── auto_batches/            # Estrutura oficial: batch_1, batch_2... (10 vídeos por lote)
+│       ├── batch_1/
+│       │   ├── video_0/ ... video_9/
+│       └── batch_2/
+│           ├── video_0/ ... video_9/
 ```
 
 ---
@@ -71,14 +76,24 @@ automotive-slop/
 - **Painel Interativo (WebUI):**
   Execute `iniciar.bat` ou `scripts\iniciar_backend.bat` e acesse `http://localhost:8501`.
 
-- **Gerar Short 9:16 (até 2.5 min com CTA):**
+- **Geração Automática Contínua em Lotes (10 vídeos por batch):**
+  ```bash
+  python src/auto_pipeline.py --count 10
+  ```
+
+- **Gerar Short 9:16 (até 2.5 min com CTA) no próximo slot do lote:**
   ```bash
   python -m src.reddit_pipeline --sub maliciouscompliance
   ```
 
-- **Gerar Vídeo Longo de 25 Minutos (História Única):**
+- **Gerar Vídeo Longo de 25 Minutos (História Única) no próximo slot do lote:**
   ```bash
   python -m src.reddit_longform
+  ```
+
+- **Verificar Status dos Batches:**
+  ```bash
+  python src/auto_pipeline.py --status
   ```
 
 - **Executar Testes:**

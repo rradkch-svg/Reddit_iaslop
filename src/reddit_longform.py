@@ -14,6 +14,7 @@ try:
     from .reddit_visuals import RedditVisualEngine
     from .reddit_subtitles import generate_reddit_ass_subtitles
     from .reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
+    from .batch_manager import BatchManager
 except ImportError:
     from logger import app_logger, LogSpan
     from reddit_scraper import EXPANDED_HIGH_CPM_STORIES, fetch_top_high_cpm_stories
@@ -22,12 +23,14 @@ except ImportError:
     from reddit_visuals import RedditVisualEngine
     from reddit_subtitles import generate_reddit_ass_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
+    from batch_manager import BatchManager
 
 def generate_25min_single_story_video(
     target_subreddit: Optional[str] = None,
     custom_post: Optional[Dict[str, Any]] = None,
     target_duration_minutes: float = 25.0,
-    output_base_dir: str = "checkpoint/reddit_longform_25min",
+    output_base_dir: str = "checkpoint/auto_batches",
+    custom_output_dir: Optional[str] = None,
     aspect_ratio: str = "16:9",
     status_callback = None
 ) -> Dict[str, Any]:
@@ -41,7 +44,7 @@ def generate_25min_single_story_video(
     4. Gameplay 1080p 60fps HD sem copyright do canal @OrbitalNCG;
     5. Legendas dinâmicas estilo Hormozi palavra por palavra;
     6. Concatenação perfeita dos capítulos em master 25min sem limite de memória;
-    7. Metadados e Timestamps oficiais prontos para monetização no YouTube.
+    7. Metadados e Timestamps oficiais salvos no padrão oficial batch_1/video_0...
     """
     with LogSpan("generate_25min_single_story_video", extra={"target_min": target_duration_minutes}):
         ffmpeg_bin = find_ffmpeg_binary()
@@ -54,9 +57,12 @@ def generate_25min_single_story_video(
             candidates = fetch_top_high_cpm_stories(subreddits=subs, max_stories=3)
             story_raw = candidates[0] if candidates else EXPANDED_HIGH_CPM_STORIES[0]
 
-        timestamp_id = int(time.time())
-        sub_slug = story_raw.get("subreddit", "reddit").replace("r/", "").replace("/", "_")
-        work_dir = os.path.abspath(os.path.join(output_base_dir, f"{sub_slug}_25min_{timestamp_id}"))
+        if custom_output_dir:
+            work_dir = os.path.abspath(custom_output_dir)
+        else:
+            # Organização oficial em batches (batch_1, batch_2...) com 10 vídeos por lote (video_0..video_9)
+            mgr = BatchManager(base_dir=output_base_dir)
+            work_dir, b_num, v_num = mgr.get_next_video_slot()
         os.makedirs(work_dir, exist_ok=True)
 
         app_logger.info(f"[Longform25Min] Iniciando produção de história única de 25 min para: '{story_raw.get('title')}'")
@@ -115,8 +121,7 @@ def generate_25min_single_story_video(
             # Card Oficial do Reddit do Capítulo
             card_png = os.path.join(work_dir, f"card_part_{ch_num:02d}.png")
             card_info = {
-                "subreddit": story_raw.get("subreddit", "r/maliciouscompliance"),
-                "author": story_raw.get("author", "u/RedditUser"),
+                "channel_name": "Reddit Minute",
                 "score": story_raw.get("score", "38.2k"),
                 "display_title": f"Part {ch_num}: {ch_title} - {story_raw.get('title', '')[:50]}"
             }

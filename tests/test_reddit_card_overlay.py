@@ -16,20 +16,24 @@ class TestRedditCardOverlay(unittest.TestCase):
         """
         ffmpeg_bin = find_ffmpeg_binary()
         ve = RedditVisualEngine()
-        
         with tempfile.TemporaryDirectory() as tmp_dir:
             card_info = {
-                "subreddit": "r/maliciouscompliance",
-                "author": "u/TestAuthor",
+                "channel_name": "Reddit Minute",
                 "score": "45.2k",
                 "display_title": "Manager ordered me to strictly obey handbook rules"
             }
 
-            # 1. Renderizar card PNG
+            # 1. Renderizar card PNG com canal "Reddit Minute" e icon.jpg
             card_png = os.path.join(tmp_dir, "test_card_9x16.png")
             ve.render_reddit_card(card_info, card_png, aspect_ratio="9:16")
             self.assertTrue(os.path.exists(card_png))
             self.assertGreater(os.path.getsize(card_png), 10000)
+
+            # Valida que o card renderiza corretamente em 16:9 também
+            card_16x9_png = os.path.join(tmp_dir, "test_card_16x9.png")
+            ve.render_reddit_card(card_info, card_16x9_png, aspect_ratio="16:9")
+            self.assertTrue(os.path.exists(card_16x9_png))
+            self.assertGreater(os.path.getsize(card_16x9_png), 10000)
 
             # 2. Gerar áudio curto de teste
             audio_engine = RedditAudioEngine()

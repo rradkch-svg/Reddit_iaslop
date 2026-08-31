@@ -12,8 +12,11 @@ cd /d "%~dp0.."
 set "PYTHONPATH=%CD%\src;%PYTHONPATH%"
 
 if not exist ".env" (
-    echo [AVISO] Arquivo .env nao encontrado na raiz do projeto.
-    echo.
+    if exist ".env.example" (
+        copy ".env.example" ".env" >nul 2>&1
+        echo [*] Arquivo .env inicializado automaticamente a partir de .env.example.
+        echo.
+    )
 )
 
 echo [*] Detectando ambiente Python 3.11+...

@@ -13,9 +13,11 @@ set "PYTHONPATH=%CD%\src;%PYTHONPATH%"
 
 REM 1. Verificacao do arquivo .env
 if not exist ".env" (
-    echo [AVISO] Arquivo .env nao encontrado na raiz do projeto.
-    echo Certifique-se de configurar a variavel GEMINI_API_KEY no arquivo .env.
-    echo.
+    if exist ".env.example" (
+        copy ".env.example" ".env" >nul 2>&1
+        echo [*] Arquivo .env inicializado automaticamente a partir de .env.example.
+        echo.
+    )
 )
 
 REM 2. Deteccao do interpretador Python correto (Python 3.11+ prioritario)

@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import json
 import time
@@ -13,6 +13,7 @@ try:
     from .reddit_visuals import RedditVisualEngine
     from .reddit_subtitles import generate_reddit_ass_subtitles
     from .reddit_render import render_reddit_story_video, find_ffmpeg_binary
+    from .batch_manager import BatchManager
 except ImportError:
     from logger import app_logger, LogSpan
     from reddit_scraper import fetch_top_high_cpm_stories
@@ -21,11 +22,13 @@ except ImportError:
     from reddit_visuals import RedditVisualEngine
     from reddit_subtitles import generate_reddit_ass_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary
+    from batch_manager import BatchManager
 
 def run_reddit_story_pipeline(
     target_subreddit: Optional[str] = None,
     custom_post: Optional[Dict[str, Any]] = None,
-    output_base_dir: str = "checkpoint/reddit_videos",
+    output_base_dir: str = "checkpoint/auto_batches",
+    custom_output_dir: Optional[str] = None,
     model_name: str = "gemini-flash-lite-latest",
     export_dual_format: bool = True,
     status_callback = None
@@ -38,7 +41,7 @@ def run_reddit_story_pipeline(
     4. Renderização do Card oficial do Reddit
     5. Geração de legendas dinâmicas estilo Hormozi
     6. Renderização de vídeo em 9:16 (Shorts) e 16:9 (Long-form)
-    7. Exportação de metadados prontos para publicação
+    7. Exportação de metadados organizados no formato oficial batch_1/video_0...
     """
     with LogSpan("run_reddit_story_pipeline"):
         if status_callback:
@@ -52,9 +55,12 @@ def run_reddit_story_pipeline(
             candidates = fetch_top_high_cpm_stories(subreddits=subs_to_scan, max_stories=5)
             story_raw = candidates[0]
 
-        timestamp_id = int(time.time())
-        sub_name = story_raw.get("subreddit", "reddit").replace("r/", "").replace("/", "_")
-        video_dir = os.path.join(output_base_dir, f"{sub_name}_{timestamp_id}")
+        if custom_output_dir:
+            video_dir = os.path.abspath(custom_output_dir)
+        else:
+            # Organização oficial em batches (batch_1, batch_2...) com 10 vídeos por lote (video_0..video_9)
+            mgr = BatchManager(base_dir=output_base_dir)
+            video_dir, b_num, v_num = mgr.get_next_video_slot()
         os.makedirs(video_dir, exist_ok=True)
 
         app_logger.info(f"[Pipeline] Processando história de {story_raw.get('subreddit')}: '{story_raw.get('title')}'")
@@ -94,8 +100,7 @@ def run_reddit_story_pipeline(
 
         visual_engine = RedditVisualEngine()
         card_info = script_data.get("ui_card", {
-            "subreddit": story_raw.get("subreddit", "r/maliciouscompliance"),
-            "author": story_raw.get("author", "u/RedditUser"),
+            "channel_name": "Reddit Minute",
             "score": story_raw.get("score", "24k"),
             "display_title": script_data.get("title", story_raw.get("title", ""))
         })

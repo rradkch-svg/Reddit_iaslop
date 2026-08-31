@@ -16,9 +16,9 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_FALLBACK_MODELS = [
     "gemini-flash-lite-latest",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash"
+    "gemini-flash-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-pro-latest"
 ]
 
 def resolve_gemini_api_keys(explicit_keys: Optional[Any] = None) -> List[str]:
@@ -182,8 +182,8 @@ def generate_with_resilience(
     response_mime_type: str = None,
     cooldown_callback = None,
     status_callback = None,
-    timeout_seconds: float = 60.0,
-    max_cooldown_retries: int = 3,
+    timeout_seconds: float = 15.0,
+    max_cooldown_retries: int = 1,
     api_keys: Optional[Any] = None
 ) -> str:
     """
@@ -270,7 +270,12 @@ def generate_with_resilience(
                         wait_sec = extract_retry_seconds(err_text)
                         min_wait_sec = min(min_wait_sec, wait_sec)
                         _KEY_COOLDOWNS[current_key] = time.time() + wait_sec
-                        record_throttling("API_GEMINI", f"Quota excedida na chave {key_display}", retry_after=wait_sec)
+                        record_throttling(
+                            source="API_GEMINI",
+                            event_type="RESOURCE_EXHAUSTED",
+                            message=f"Quota excedida na chave {key_display}",
+                            retry_after=wait_sec
+                        )
                         app_logger.warning(f"[Gemini API] Quota atingida na chave {key_display} (espera: {wait_sec}s). Tentando próxima chave...")
                         continue
 

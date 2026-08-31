@@ -1,4 +1,4 @@
-﻿import os
+import os
 import textwrap
 from typing import Dict, Any, Tuple, Optional
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -41,12 +41,8 @@ class RedditVisualEngine:
         img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
 
         # Configurações de dados
-        subreddit = card_data.get("subreddit", "r/maliciouscompliance")
-        if not subreddit.startswith("r/"):
-            subreddit = f"r/{subreddit}"
-        author = card_data.get("author", "u/RedditUser")
-        if not author.startswith("u/"):
-            author = f"u/{author}"
+        channel_name = card_data.get("channel_name", "Reddit Minute")
+        time_ago = card_data.get("time_ago", "4h ago")
         score = card_data.get("score", "38.2k")
         display_title = card_data.get("display_title", card_data.get("title", "Insane Reddit Story"))
 
@@ -96,19 +92,63 @@ class RedditVisualEngine:
         card_box = [card_x0, card_y0, card_x1, card_y1]
         draw.rounded_rectangle(card_box, radius=28, fill=(18, 18, 19, 255), outline=(60, 62, 65, 255), width=3)
 
-        # 3. Ícone do Subreddit (Círculo Laranja #FF4500 com Snoo/R)
+        # 3. Ícone do Canal (Avatar Circular a partir de icon.jpg)
         icon_size = 58
         icon_x = card_x0 + padding
         icon_y = card_y0 + padding
-        draw.ellipse([icon_x, icon_y, icon_x + icon_size, icon_y + icon_size], fill=(255, 69, 0, 255))
-        draw.text((icon_x + 18, icon_y + 10), "r/", font=get_font(30, bold=True), fill=(255, 255, 255, 255))
+        
+        # Localiza o arquivo de ícone customizado
+        icon_candidate = card_data.get("icon_path", r"C:\Users\Aluno\Downloads\icon.jpg")
+        if not (icon_candidate and os.path.exists(icon_candidate)):
+            fallback_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "icon.jpg")
+            if os.path.exists(fallback_icon):
+                icon_candidate = fallback_icon
+            else:
+                icon_candidate = None
 
-        # 4. Header: Subreddit + Autor + Timestamp
+        icon_rendered = False
+        if icon_candidate and os.path.exists(icon_candidate):
+            try:
+                with Image.open(icon_candidate) as src_icon:
+                    src_icon = src_icon.convert("RGBA")
+                    # Crop para proporção quadrada centralizada
+                    sw, sh = src_icon.size
+                    min_side = min(sw, sh)
+                    cx, cy = (sw - min_side) // 2, (sh - min_side) // 2
+                    src_icon = src_icon.crop((cx, cy, cx + min_side, cy + min_side))
+                    
+                    # Máscara circular com supersampling para bordas ultra-suaves
+                    scale = 4
+                    hi_size = icon_size * scale
+                    src_icon = src_icon.resize((hi_size, hi_size), Image.Resampling.LANCZOS)
+                    
+                    mask = Image.new("L", (hi_size, hi_size), 0)
+                    mask_d = ImageDraw.Draw(mask)
+                    mask_d.ellipse((0, 0, hi_size - 1, hi_size - 1), fill=255)
+                    
+                    circ_img = Image.new("RGBA", (hi_size, hi_size), (0, 0, 0, 0))
+                    circ_img.paste(src_icon, (0, 0), mask=mask)
+                    circ_img = circ_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
+                    
+                    img.paste(circ_img, (icon_x, icon_y), mask=circ_img)
+                    
+                    # Borda sutil de destaque ao redor do avatar
+                    draw.ellipse([icon_x, icon_y, icon_x + icon_size, icon_y + icon_size], outline=(255, 69, 0, 180), width=2)
+                    icon_rendered = True
+            except Exception:
+                icon_rendered = False
+
+        if not icon_rendered:
+            # Fallback caso a imagem não possa ser carregada
+            draw.ellipse([icon_x, icon_y, icon_x + icon_size, icon_y + icon_size], fill=(255, 69, 0, 255))
+            draw.text((icon_x + 10, icon_y + 12), "RM", font=get_font(28, bold=True), fill=(255, 255, 255, 255))
+
+        # 4. Header: Nome do Canal "Reddit Minute" + Timestamp
         text_start_x = icon_x + icon_size + 18
-        draw.text((text_start_x, icon_y + 4), subreddit, font=font_sub, fill=(255, 255, 255, 255))
-        sub_len = draw.textlength(subreddit, font=font_sub)
-        meta_str = f" • Posted by {author} • 4h ago"
-        draw.text((text_start_x + sub_len, icon_y + 8), meta_str, font=font_meta, fill=(145, 148, 150, 255))
+        draw.text((text_start_x, icon_y + 4), channel_name, font=font_sub, fill=(255, 255, 255, 255))
+        channel_len = draw.textlength(channel_name, font=font_sub)
+        meta_str = f" • {time_ago}"
+        draw.text((text_start_x + channel_len, icon_y + 8), meta_str, font=font_meta, fill=(145, 148, 150, 255))
 
         # 5. Título em Negrito e Alta Nitidez
         curr_y = icon_y + icon_size + 26

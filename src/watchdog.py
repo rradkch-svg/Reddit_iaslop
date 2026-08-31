@@ -98,65 +98,112 @@ def is_pid_running(pid: int) -> bool:
             return False
 
 
+def find_running_generator_pids() -> list[int]:
+    """
+    Localiza PIDs de processos do Python que estão executando scripts de geração do estúdio.
+    Verifica auto_pipeline.py, reddit_pipeline.py, reddit_longform.py, reddit_compilation.py.
+    """
+    current_pid = os.getpid()
+    found_pids: list[int] = []
+
+    if sys.platform == "win32":
+        # 1. Tentativa via WMIC (rápido e de baixo overhead)
+        try:
+            res = subprocess.run(
+                ["wmic", "process", "where", "name like 'python%'", "get", "ProcessId,CommandLine", "/format:csv"],
+                capture_output=True, text=True, errors="ignore", timeout=4
+            )
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if any(target in line for target in ["auto_pipeline", "reddit_pipeline", "reddit_longform", "reddit_compilation"]):
+                        parts = line.strip().split(",")
+                        for p in parts:
+                            if p.isdigit():
+                                pid = int(p)
+                                if pid != current_pid and is_pid_running(pid):
+                                    found_pids.append(pid)
+                if found_pids:
+                    return list(set(found_pids))
+        except Exception:
+            pass
+
+        # 2. Fallback via PowerShell
+        try:
+            ps_script = (
+                "Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
+                "Where-Object { $_.CommandLine -and ($_.CommandLine -match 'auto_pipeline|reddit_pipeline|reddit_longform|reddit_compilation') } | "
+                "Select-Object -ExpandProperty ProcessId"
+            )
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+                capture_output=True, text=True, errors="ignore", timeout=4
+            )
+            if res.returncode == 0:
+                for line in res.stdout.strip().splitlines():
+                    line = line.strip()
+                    if line.isdigit():
+                        pid = int(line)
+                        if pid != current_pid and is_pid_running(pid):
+                            found_pids.append(pid)
+                if found_pids:
+                    return list(set(found_pids))
+        except Exception:
+            pass
+
+    return list(set(found_pids))
+
+
 def is_generator_running() -> Tuple[bool, Optional[int], str]:
     """
-    Verifica de forma ultra-confiável se o gerador (auto_pipeline.py) já está ativo.
-    Testa o bloqueio de arquivo (lock do SO) e o PID registrado.
+    Verifica de forma ultra-confiável e em camadas se o gerador (auto_pipeline.py/reddit_pipeline.py) já está ativo.
+    Camada 1: Arquivo de lock (.pipeline.lock) e verificação de PID ativo.
+    Camada 2: Escaneamento ativo de processos do SO.
     Retorna (is_running, pid, reason).
     """
-    if not os.path.exists(LOCK_FILE):
-        return False, None, "Arquivo de lock inexistente"
-
-    # Tenta ler o PID do arquivo de lock
-    recorded_pid = None
-    try:
-        with open(LOCK_FILE, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-            if content.isdigit():
-                recorded_pid = int(content)
-    except Exception:
-        pass
-
-    # Testa se o arquivo está bloqueado pelo msvcrt (Windows) ou fcntl (Linux)
-    if sys.platform == "win32":
-        import msvcrt
-        test_handle = None
+    # Camada 1: Checa arquivo de lock
+    if os.path.exists(LOCK_FILE):
+        recorded_pid = None
         try:
-            test_handle = open(LOCK_FILE, "a+")
-            test_handle.seek(0)
-            # Tenta aplicar trava de 1 byte sem bloquear
-            msvcrt.locking(test_handle.fileno(), msvcrt.LK_NBLCK, 1)
-            # Se conseguiu travar, significa que nenhuma outra instância segura a trava
-            msvcrt.locking(test_handle.fileno(), msvcrt.LK_UNLCK, 1)
-            test_handle.close()
-            # Se havia um PID registrado mas a trava estava livre, checa se o processo morreu
-            if recorded_pid and not is_pid_running(recorded_pid):
-                return False, recorded_pid, f"Processo anterior (PID {recorded_pid}) encerrou; lock livre"
-            return False, recorded_pid, "Lock livre (nenhum processo retém trava do SO)"
-        except (IOError, OSError, PermissionError):
-            # Não conseguiu travar porque outro processo ativo está segurando a trava
-            if test_handle:
-                try:
-                    test_handle.close()
-                except Exception:
-                    pass
-            return True, recorded_pid, f"Instância ativa detectada com lock do SO (PID: {recorded_pid})"
-    else:
-        import fcntl
-        test_handle = None
+            with open(LOCK_FILE, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content.isdigit():
+                    recorded_pid = int(content)
+        except Exception:
+            pass
+
+        if recorded_pid and is_pid_running(recorded_pid):
+            return True, recorded_pid, f"Instância ativa detectada no lockfile (PID: {recorded_pid})"
+
+        if sys.platform == "win32":
+            import msvcrt
+            test_handle = None
+            try:
+                test_handle = open(LOCK_FILE, "a+")
+                test_handle.seek(0)
+                msvcrt.locking(test_handle.fileno(), msvcrt.LK_NBLCK, 1)
+                msvcrt.locking(test_handle.fileno(), msvcrt.LK_UNLCK, 1)
+                test_handle.close()
+            except (IOError, OSError, PermissionError):
+                if test_handle:
+                    try:
+                        test_handle.close()
+                    except Exception:
+                        pass
+                return True, recorded_pid, f"Instância ativa detectada com lock do SO (PID: {recorded_pid})"
+
+    # Camada 2: Escaneamento dinâmico de processos em execução
+    running_pids = find_running_generator_pids()
+    if running_pids:
+        active_pid = running_pids[0]
+        # Sincroniza o lockfile para que as próximas checagens sejam instantâneas
         try:
-            test_handle = open(LOCK_FILE, "w+")
-            fcntl.flock(test_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            fcntl.flock(test_handle.fileno(), fcntl.LOCK_UN)
-            test_handle.close()
-            return False, recorded_pid, "Lock livre"
-        except (IOError, OSError, BlockingIOError):
-            if test_handle:
-                try:
-                    test_handle.close()
-                except Exception:
-                    pass
-            return True, recorded_pid, f"Instância ativa detectada (PID: {recorded_pid})"
+            with open(LOCK_FILE, "w", encoding="utf-8") as f:
+                f.write(f"{active_pid}\n")
+        except Exception:
+            pass
+        return True, active_pid, f"Instância ativa do gerador detectada via processos do SO (PID: {active_pid})"
+
+    return False, None, "Nenhum processo gerador ativo no sistema"
 
 
 def find_python_executable() -> str:
