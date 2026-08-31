@@ -77,5 +77,29 @@ class TestRedditCardOverlay(unittest.TestCase):
             max_val = max(c[1] if isinstance(c, tuple) else c for c in extrema)
             self.assertGreater(max_val, 200, "O Card do Reddit não apareceu no vídeo aos 2 segundos!")
 
+    def test_chunk_rendering_without_card_overlay(self):
+        """Verifica que chunks de capitulos (Part 2+) renderizam limpos sem card overlay."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            audio_engine = RedditAudioEngine()
+            audio_path = os.path.join(tmp_dir, "test_chunk_audio.mp3")
+            text = "The second phase of the directive unfolded with complete precision."
+            words_timing = audio_engine.generate_speech(text, audio_path)
+
+            ass_path = os.path.join(tmp_dir, "test_chunk_subs.ass")
+            generate_reddit_ass_subtitles(words_timing, ass_path, aspect_ratio="16:9")
+
+            out_video = os.path.join(tmp_dir, "test_chunk_video.mp4")
+            ok, msg = render_reddit_story_video(
+                audio_path=audio_path,
+                ass_subtitles_path=ass_path,
+                card_png_path=None,
+                output_video_path=out_video,
+                video_type="chunk",
+                aspect_ratio="16:9",
+                card_duration_sec=0.0
+            )
+            self.assertTrue(ok, f"Falha na renderização de chunk: {msg}")
+            self.assertTrue(os.path.exists(out_video))
+
 if __name__ == "__main__":
     unittest.main()

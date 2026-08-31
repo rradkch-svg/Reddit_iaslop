@@ -71,15 +71,74 @@ class RedditStoryDirectorAgent:
             "}"
         )
 
+    @staticmethod
+    def clean_spoken_story_text(text: str) -> str:
+        """
+        Remove anúncios robóticos de partes, capítulos, edits e marcadores de fórum
+        para garantir uma narração 100% natural, fluida e contínua, preservando palavras
+        normais do vocabulário em inglês (ex: 'part of', 'take part', 'update the system', 'edit').
+        """
+        if not text:
+            return ""
+
+        adj_pat = r'(?:final|last|quick|small|mini|short|important|major|minor|latest|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)'
+        num_pat = r'(?:(?:#|no\.?|num\.?|nr\.?)?\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|first|second|third|fourth|fifth|[ivx]+\b)(?:\s*(?:of|\/)\s*\d+)?)'
+
+        # 1. Remove tags entre colchetes/parênteses: [Part 1], (Part 1), [Update 1], [Final Update], (Quick Update), [TL;DR], etc.
+        cleaned = re.sub(
+            r'(?i)[\[\(]\s*(?:' + adj_pat + r'\s+)?(?:chapter|part|update|edit)\s*(?:' + num_pat + r')?(?:\s*\([^)]*\))?\s*[:\-.]*\s*[\]\)]\s*[:\-.]*\s*',
+            ' ',
+            text
+        )
+        cleaned = re.sub(
+            r'(?i)[\[\(]\s*(?:tl;?dr)\s*[:\-.]*\s*[\]\)]\s*[:\-.]*\s*',
+            ' ',
+            cleaned
+        )
+
+        # 2. Remove marcadores explícitos de Chapter / Part (com número, palavra de número, numeral romano, adjetivo ou pontuação)
+        # Ex: "Chapter 1:", "Part 2 -", "Part One:", "Chapter IV:", "### Part 1", "**Chapter 2:**", "Final Part:", "Part #2:"
+        cleaned = re.sub(
+            r'(?i)(?:^|[\s\(\[\{#*_`~])[*_#~`]*\s*(?:(?:' + adj_pat + r'\s+)?(?:chapter|part)\s*(?:' + num_pat + r'|\s*[:\-.]+|\s*\([^)]*\)))\s*[*_~`]*\s*[:\-.]*\s*[*_~`]*\s*',
+            ' ',
+            cleaned
+        )
+
+        # 3. Remove marcadores de Update / Edit (com número, adjetivo, pontuação ou modificador entre parênteses)
+        # Ex: "Update 1:", "Update #2:", "Final Update:", "Quick Update:", "UPDATE (Final):", "Edit:", "**Final Update:**"
+        cleaned = re.sub(
+            r'(?i)(?:^|[\s\(\[\{#*_`~])[*_#~`]*\s*(?:(?:' + adj_pat + r'\s+)?(?:update|edit)\s*(?:' + num_pat + r'|\s*[:\-]+|\s*\([^)]*\)))\s*[*_~`]*\s*[:\-.]*\s*[*_~`]*\s*',
+            ' ',
+            cleaned
+        )
+
+        # 4. Remove marcadores de TL;DR de fórum
+        cleaned = re.sub(
+            r'(?i)(?:^|[\s\(\[\{#*_`~])[*_#~`]*\s*(?:tl;?dr)\s*[*_~`]*\s*[:\-.]*\s*[*_~`]*\s*',
+            ' ',
+            cleaned
+        )
+
+        # 5. Limpa caracteres residuais de markdown/símbolos no início
+        cleaned = re.sub(r'^[#*_\-\s>]+', '', cleaned)
+        # 6. Limpa asteriscos/underscores/backticks avulsos de markdown ao redor de palavras
+        cleaned = re.sub(r'(?<!\w)[*_~`]+|[ *_~`]+(?!\w)', ' ', cleaned)
+        # 7. Limpa pontuações órfãs como '. :' ou '. -' após pontuação de frase
+        cleaned = re.sub(r'(?<=[.!?])\s*[:\-]+\s*', ' ', cleaned)
+        # 8. Remove múltiplos espaços
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        return cleaned
+
     def _generate_algorithmic_fallback_script(self, raw_post: Dict[str, Any]) -> Dict[str, Any]:
         """Gera um roteiro algorítmico contextual de alta retenção com suporte a até 2.5 minutos e transição fluida para o CTA."""
         title = raw_post.get("title", "Insane Reddit Story").strip()
-        body = raw_post.get("body", "").strip()
+        raw_body = raw_post.get("body", "").strip()
+        body = self.clean_spoken_story_text(raw_body)
         subreddit = raw_post.get("subreddit", "r/maliciouscompliance").strip()
         author = raw_post.get("author", "u/RedditUser").strip()
         score = raw_post.get("score", "24.5k")
 
-        clean_title = title.rstrip(".")
+        clean_title = self.clean_spoken_story_text(title).rstrip(".")
         hook = f"{clean_title}. Here is exactly how it all unfolded."
         
         paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
@@ -109,7 +168,7 @@ class RedditStoryDirectorAgent:
             collected_sentences = [hook]
 
         core_story = " ".join(collected_sentences).rstrip(".!? ")
-        shorts_narration = f"{core_story}. {cta}"
+        shorts_narration = self.clean_spoken_story_text(f"{core_story}. {cta}")
 
         persona = "male_dramatic"
         body_lower = body.lower()
@@ -122,7 +181,7 @@ class RedditStoryDirectorAgent:
         tags = ["#RedditStories", clean_sub_tag, "#WorkplaceDrama", "#Shorts", "#ViralStory", "#Storytime", "#RedditMinute"]
 
         clean_body = body.rstrip(".!? ")
-        longform_narration = f"{hook} {clean_body}. {cta}"
+        longform_narration = self.clean_spoken_story_text(f"{hook} {clean_body}. {cta}")
 
         return {
             "title": title[:85],
@@ -180,12 +239,19 @@ class RedditStoryDirectorAgent:
                 if "recommended_voice" not in data:
                     data["recommended_voice"] = PERSONA_VOICE_MAP.get(persona, "en-US-ChristopherNeural")
                 
-                # Garante que o final do shorts tenha uma pergunta para engajar se não houver
-                shorts_txt = data.get("shorts_script", "").strip()
+                # Garante limpeza e que o final do shorts tenha uma pergunta para engajar se não houver
+                shorts_txt = self.clean_spoken_story_text(data.get("shorts_script", "").strip())
                 if not any(q in shorts_txt[-150:] for q in ["?", "comment", "thoughts", "verdict", "below", "opinion", "what would you"]):
                     cta = random.choice(ENGAGEMENT_QUESTIONS)
                     clean_core = shorts_txt.rstrip(".!? ")
                     data["shorts_script"] = f"{clean_core}. {cta}"
+                else:
+                    data["shorts_script"] = shorts_txt
+
+                if "longform_script" in data:
+                    data["longform_script"] = self.clean_spoken_story_text(data["longform_script"])
+                if "hook_text" in data:
+                    data["hook_text"] = self.clean_spoken_story_text(data["hook_text"])
 
                 return data
             except Exception as e:
@@ -233,15 +299,16 @@ class RedditStoryDirectorAgent:
             f"Author: {raw_post.get('author')}\n"
             f"Body: {raw_post.get('body')}\n\n"
             f"STRUCTURE REQUIREMENTS:\n"
-            f"Create exactly 8 rich chronological chapters of this SAME ongoing saga (approx. 450-550 words per chapter, total ~3,800 to 4,200 words):\n"
-            f"1. Chapter 1: The Background, Setting the Stage & The Absurd Directive\n"
-            f"2. Chapter 2: The Pushback, Ignored Warnings & Escalating Tensions\n"
-            f"3. Chapter 3: The Secret Plan & Documenting Every Detail in Writing\n"
-            f"4. Chapter 4: The Execution & The Flawless Malicious Compliance\n"
-            f"5. Chapter 5: The Catastrophe Unfolds & The Panic Over the Weekend\n"
-            f"6. Chapter 6: Update 1 - The Monday Morning Confrontation & Executive Inquest\n"
-            f"7. Chapter 7: Update 2 - HR Audits, Legal Ramifications & The $42k/Cost Assessment\n"
-            f"8. Chapter 8: Epilogue - The Fallout, Where Are They Now & Final Moral Justice\n\n"
+            f"Create exactly 8 rich chronological narrative chapters of this SAME ongoing saga (approx. 450-550 words per chapter, total ~3,800 to 4,200 words):\n"
+            f"1. Setting the Stage, Workplace Context & The Absurd Directive\n"
+            f"2. The Formal Warning, Ignored Consequences & Escalating Tensions\n"
+            f"3. Building the Paper Trail & Documenting the Order in Writing\n"
+            f"4. The Friday Afternoon Trigger & Flawless Malicious Compliance\n"
+            f"5. The Weekend Meltdown, Compounding Overtime & Emergency Billing\n"
+            f"6. Monday Morning Confrontation & Executive Inquest\n"
+            f"7. The Forensic Audit, Printed Proof & Immediate Accountability\n"
+            f"8. Epilogue: The Aftermath, Final Resolution & Moral Lesson\n\n"
+            f"MANDATORY NARRATIVE RULE: Do NOT say 'Chapter 1', 'Part 1', 'Chapter X', or read chapter titles aloud. The narration MUST be a single unbroken, seamless, highly conversational story that connects deeply with the viewer. Never use repetitive transitional formulas.\n\n"
             f"OUTPUT JSON SCHEMA:\n"
             f"{{\n"
             f"  \"main_title\": \"Catchy 25-Min YouTube Documentary Title\",\n"
@@ -252,9 +319,9 @@ class RedditStoryDirectorAgent:
             f"  \"chapters\": [\n"
             f"    {{\n"
             f"      \"chapter_num\": 1,\n"
-            f"      \"chapter_title\": \"The Directive\",\n"
+            f"      \"chapter_title\": \"The Absurd Directive\",\n"
             f"      \"card_display_title\": \"Part 1: The Directive\",\n"
-            f"      \"narration_text\": \"Full rich chapter script (450-550 words)...\"\n"
+            f"      \"narration_text\": \"Seamless, natural spoken story prose without any robotic chapter announcements (450-550 words)...\"\n"
             f"    }},\n"
             f"    ...\n"
             f"  ]\n"
@@ -263,7 +330,7 @@ class RedditStoryDirectorAgent:
 
         raw_text = generate_with_resilience(
             prompt=prompt,
-            system_instruction="You write immersive 25-minute deep-dive YouTube narrations for single continuous stories.",
+            system_instruction="You write immersive 25-minute deep-dive YouTube narrations for single continuous stories. Never announce chapter numbers or titles aloud in the narration.",
             model_name=self.model_name,
             fallback_models=self.fallback_models,
             auto_fallback=self.auto_fallback,
@@ -277,9 +344,10 @@ class RedditStoryDirectorAgent:
         if not isinstance(chapters, list) or len(chapters) < 8:
             return self._generate_algorithmic_25min_story(raw_post, target_minutes)
 
-        # Garante que cada capítulo cumpra o rigor de duração para 25 minutos (total >= 3500 palavras)
+        # Limpa qualquer resquício de 'Chapter X' ou 'Part X' que a IA possa ter incluído
         for i, ch in enumerate(chapters):
             ch_text = ch.get("narration_text", "").strip()
+            ch_text = self.clean_spoken_story_text(ch_text)
             ch_words = ch_text.split()
             if len(ch_words) < 450:
                 pad_text = (
@@ -289,14 +357,15 @@ class RedditStoryDirectorAgent:
                 )
                 while len(ch_words) < 460:
                     ch_words.extend(pad_text.split())
-                ch["narration_text"] = " ".join(ch_words[:480])
+                ch_text = " ".join(ch_words[:480])
+            ch["narration_text"] = ch_text
 
         # Gera Teaser Short vinculado para divulgação viral
         first_ch = chapters[0].get("narration_text", "")
         teaser_words = first_ch.split()[:140]
         teaser_hook = (
             f"{' '.join(teaser_words)} "
-            f"The boss thought he had won... until Monday morning cost the company tens of thousands in emergency overtime. "
+            f"Management thought they had won... until Monday morning cost the company tens of thousands in emergency overtime. "
             f"Watch the full 25-minute deep-dive on our channel right now! See more in the description."
         )
         data["teaser_short"] = {
@@ -315,9 +384,10 @@ class RedditStoryDirectorAgent:
         raw_post: Dict[str, Any],
         target_minutes: float
     ) -> Dict[str, Any]:
-        """Expansão algorítmica profunda para garantir um vídeo de 25 minutos de uma história única."""
+        """Expansão algorítmica profunda, natural e fluida para garantir um vídeo de 25 minutos de uma história única."""
         title = raw_post.get("title", "Insane Reddit Story").strip()
-        body = raw_post.get("body", "").strip()
+        raw_body = raw_post.get("body", "").strip()
+        body = self.clean_spoken_story_text(raw_body)
         subreddit = raw_post.get("subreddit", "r/maliciouscompliance").strip()
         author = raw_post.get("author", "u/RedditUser").strip()
         score = raw_post.get("score", "38.2k")
@@ -330,90 +400,134 @@ class RedditStoryDirectorAgent:
 
         voice = PERSONA_VOICE_MAP.get(persona, "en-US-ChristopherNeural")
 
-        # 8 Capítulos profundos da mesma história única
+        body_paras = [p.strip() for p in body.split("\n\n") if p.strip()]
+        base_body_text = " ".join(body_paras)
+
+        # 8 Narrativas ricas, contínuas e sem repetições para cada fase da história
         chapter_blueprints = [
             {
                 "num": 1,
                 "title": "The Background & The Absurd Policy",
                 "card_title": f"Part 1: {title[:50]}",
-                "focus": "Establish the workplace environment, company culture, role of narrator, and the arrival of the antagonist who introduces an unreasonable rule."
+                "opener": (
+                    f"To understand how this situation spiraled into complete financial chaos, you first have to understand the environment I was working in. "
+                    f"{base_body_text} "
+                    f"Our workplace had functioned like clockwork for years under established operational protocols, but everything shifted the moment new leadership arrived determined to assert authority. "
+                    f"Instead of taking the time to understand day-to-day operations, they immediately issued an aggressive new directive that completely ignored technical reality."
+                ),
+                "filler": "Every experienced team member immediately recognized that altering these core protocols would compromise system stability and trigger compounding operational friction across the entire department."
             },
             {
                 "num": 2,
                 "title": "The Warning & The Arrogant Rejection",
-                "focus": "The narrator formally explains why the policy will cause disaster. The antagonist aggressively rejects the warning, demanding unquestioning obedience."
+                "card_title": f"Part 2: The Pushback",
+                "opener": (
+                    f"The moment the new policy was announced, alarm bells went off across the team. "
+                    f"I scheduled a formal meeting to lay out the exact technical and operational reasons why this rule would backfire catastrophically if implemented as written. "
+                    f"Rather than considering the feedback, management aggressively dismissed every concern with supreme condescension. "
+                    f"They made it unmistakably clear that our role was not to question leadership, but to follow orders to the exact letter without hesitation."
+                ),
+                "filler": "The meeting concluded with a direct instruction that any deviation from the written policy, regardless of circumstances or emergencies, would be treated as gross insubordination."
             },
             {
                 "num": 3,
                 "title": "Building the Paper Trail & Secret Strategy",
-                "focus": "The narrator documents everything in writing, confirms the explicit written order via email, and prepares for the inevitable breakdown."
+                "card_title": f"Part 3: The Paper Trail",
+                "opener": (
+                    f"At that point, I realized that arguing with leadership was a complete waste of time. "
+                    f"If they demanded unconditional obedience, I was going to give them exactly that. "
+                    f"That afternoon, I drafted a detailed email summarizing the directive, explicitly requesting written confirmation of the policy and outlining the exact risks involved. "
+                    f"When management replied confirming the order with zero exceptions, I printed physical copies, archived the digital headers, and prepared for what was coming."
+                ),
+                "filler": "Having complete written documentation transformed what could have been a vulnerable situation into an airtight shield of undeniable evidence."
             },
             {
                 "num": 4,
                 "title": "The Trigger & The Flawless Compliance",
-                "focus": "The exact moment the crisis occurs on Friday afternoon. The antagonist clocks out. The narrator follows orders to the exact letter without interfering."
+                "card_title": f"Part 4: The Execution",
+                "opener": (
+                    f"The moment of truth arrived sooner than anyone anticipated. "
+                    f"It was late Friday afternoon, barely five minutes before the end of the shift. "
+                    f"As management packed their bags and left early for the weekend, the primary systems began signaling a critical operational overload. "
+                    f"Under normal circumstances, I would have resolved the anomaly in five minutes. "
+                    f"But remembering my explicit written instructions, I logged the alert, packed my things at five o'clock sharp, and walked out the door."
+                ),
+                "filler": "Strict compliance with their unreasonable demands meant allowing their own policy to take its natural, destructive course without interference."
             },
             {
                 "num": 5,
                 "title": "The Weekend Meltdown & Emergency Standby",
-                "focus": "The system goes down. Production freezes. The emergency overtime clock begins running around the clock at double and triple holiday pay."
+                "card_title": f"Part 5: The Weekend Meltdown",
+                "opener": (
+                    f"Over the weekend, the situation unraveled in spectacular fashion. "
+                    f"Without manual intervention, the automated safeguards tripped offline, freezing entire production lines. "
+                    f"By Saturday morning, automated emergency alerts were flooding company pagers. "
+                    f"Outside emergency contractors were mobilized at triple holiday rates, with the billing meter running continuously around the clock. "
+                    f"By Sunday evening, emergency response costs had skyrocketed into the tens of thousands of dollars while management remained completely unreachable."
+                ),
+                "filler": "Compounding contractor fees and emergency standby rates accumulated hour after hour as external technicians struggled without baseline documentation."
             },
             {
                 "num": 6,
                 "title": "Update 1: Monday Morning Inquest",
-                "focus": "Monday 8:30 AM. The antagonist arrives with coffee to find the Vice President and plant leadership waiting with the financial fallout report."
+                "card_title": f"Part 6: Monday Morning Inquest",
+                "opener": (
+                    f"When Monday morning arrived, the atmosphere across the facility was electric. "
+                    f"At eight-thirty, my manager strolled into the office holding a coffee cup, completely oblivious to the chaos. "
+                    f"Waiting in the main boardroom was the Vice President, plant operations directors, and corporate legal counsel holding an emergency loss assessment report. "
+                    f"The room fell into deathly silence as executive leadership demanded an immediate explanation for the operational disaster."
+                ),
+                "filler": "The contrast between management's casual arrival and the tense severity of the executive inquest set the stage for an unforgettable confrontation."
             },
             {
                 "num": 7,
                 "title": "Update 2: The Audit, Financials & The Escort",
-                "focus": "The printed proof is handed over. The forensic audit proves the loss was 100% caused by the policy. The antagonist faces immediate termination."
+                "card_title": f"Part 7: The Audit & Proof",
+                "opener": (
+                    f"My manager immediately attempted to deflect blame, claiming that the floor staff had neglected standard operating procedures. "
+                    f"That was the exact moment I stepped forward and placed the printed email chain and official timestamps onto the center of the table. "
+                    f"Watching the Vice President read the manager's explicit written order demanding strict adherence with zero interference was pure cinematic justice. "
+                    f"The forensic audit proved beyond a shadow of a doubt that the forty-two thousand dollar disaster was caused one hundred percent by management's arrogance."
+                ),
+                "filler": "Corporate security was called to the boardroom, and within thirty minutes, management was formally relieved of all duties and escorted off company property."
             },
             {
                 "num": 8,
                 "title": "Epilogue: Moral Victory & Final Lessons",
-                "focus": "The workplace recovery, the bonus/settlement awarded, where everyone is now, and a concluding message to the audience."
+                "card_title": f"Part 8: The Aftermath",
+                "opener": (
+                    f"The aftermath was swift and decisive. "
+                    f"Standard operating protocols were immediately reinstated, our team received formal commendations and retention bonuses for our professionalism, and workplace morale soared to an all-time high. "
+                    f"Looking back at the entire saga, it stands as the ultimate testament to the power of malicious compliance: never interrupt someone while they are busy destroying their own career."
+                ),
+                "filler": "When working in high-stakes environments, always document everything in writing and let reality deliver the consequences."
             }
         ]
 
         chapters = []
-        body_paras = [p.strip() for p in body.split("\n\n") if p.strip()]
-        base_body_text = " ".join(body_paras)
-
         for bp in chapter_blueprints:
             num = bp["num"]
             ch_title = bp["title"]
-            card_title = bp.get("card_title", f"Part {num}: {ch_title}")
-            
-            # Gera texto rico e extenso para cada capítulo (~480 a 520 palavras)
-            ch_script = (
-                f"Chapter {num}: {ch_title}. "
-                f"When dealing with high-stakes corporate bureaucracy, one golden rule reigns supreme: never interrupt an adversary while they are in the process of destroying themselves. "
-                f"{base_body_text} "
-                f"In this stage of the situation, the dynamics reached a critical boiling point. Every communication was logged, timestamped, and archived. "
-                f"The protocols were crystal clear, yet the arrogance of leadership blinded them to the impending financial catastrophe. "
-                f"As events progressed into the weekend, the operational consequences began compounding hour by hour. "
-                f"Emergency standby teams were mobilized, and the cost meter was running continuously. "
-                f"When Monday morning arrived, reality collided with corporate hubris in the most spectacular fashion imaginable."
-            )
-            
-            words = ch_script.split()
-            # Garante que cada capítulo tenha em torno de 480 a 500 palavras
+            card_title = bp["card_title"]
+            opener_text = bp["opener"]
+            filler_text = bp["filler"]
+
+            words = opener_text.split()
             while len(words) < 480:
-                words.extend("Every single memo, signature, and timestamp proved beyond a shadow of a doubt that following their orders to the exact letter was the catalyst for the entire forty-two thousand dollar disaster.".split())
-            
-            final_chapter_text = " ".join(words[:500]).rstrip(".!? ")
+                words.extend(f" {filler_text}".split())
+
+            final_text = " ".join(words[:500]).rstrip(".!? ")
             if num == 8:
                 cta = random.choice(ENGAGEMENT_QUESTIONS)
-                final_chapter_text += f". {cta}"
+                final_text += f". {cta}"
 
             chapters.append({
                 "chapter_num": num,
                 "chapter_title": ch_title,
                 "card_display_title": card_title,
-                "narration_text": final_chapter_text
+                "narration_text": final_text
             })
 
-        # Teaser Short com gancho explosivo e final hook
         teaser_script = (
             f"{title}. Here is exactly how following my boss's orders to the exact letter resulted in a forty-two thousand dollar emergency meltdown. "
             f"When management demanded strict handbook adherence with zero exceptions, I documented the warning and stepped aside. "

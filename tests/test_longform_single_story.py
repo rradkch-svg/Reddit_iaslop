@@ -13,7 +13,7 @@ class TestLongformSingleStory(unittest.TestCase):
         director = RedditStoryDirectorAgent()
         story = EXPANDED_HIGH_CPM_STORIES[0]
 
-        longform_data = director.expand_25min_single_story(story, target_minutes=25.0)
+        longform_data = director._generate_algorithmic_25min_story(story, target_minutes=25.0)
         
         self.assertIn("chapters", longform_data)
         chapters = longform_data["chapters"]
@@ -22,10 +22,24 @@ class TestLongformSingleStory(unittest.TestCase):
         total_words = sum(len(c.get("narration_text", "").split()) for c in chapters)
         self.assertGreaterEqual(total_words, 3500, f"Total de palavras ({total_words}) insuficiente para 25 minutos.")
 
+        openers = []
         for ch in chapters:
             self.assertIsNotNone(ch.get("chapter_num"))
             self.assertTrue(ch.get("chapter_title"))
-            self.assertGreaterEqual(len(ch.get("narration_text", "").split()), 350)
+            narr = ch.get("narration_text", "")
+            self.assertGreaterEqual(len(narr.split()), 350)
+            # Sem anuncios roboticos falados
+            self.assertFalse(narr.lower().startswith(("chapter", "part")), f"Capitulo inicia com prefixo robotico: {narr[:30]}")
+            openers.append(narr[:30].strip())
+
+        # Transicoes diversas
+        self.assertEqual(len(set(openers)), 8, f"Inicios de capitulos repetidos: {openers}")
+
+        # Teaser short sem marcadores roboticos falados
+        teaser = longform_data.get("teaser_short", {})
+        teaser_script = teaser.get("script", "")
+        self.assertTrue(teaser_script)
+        self.assertFalse(teaser_script.lower().startswith(("chapter", "part")))
 
 if __name__ == "__main__":
     unittest.main()

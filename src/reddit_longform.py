@@ -131,14 +131,17 @@ def generate_25min_single_story_video(
             seg_dur = get_media_duration(seg_audio_path, ffmpeg_bin)
             chapter_audio_files.append(seg_audio_path)
 
-            # Card Oficial do Reddit do Capítulo
-            card_png = os.path.join(cards_dir, f"card_part_{ch_num:02d}.png")
-            card_info = {
-                "channel_name": "Reddit Minute",
-                "score": story_raw.get("score", "38.2k"),
-                "display_title": f"Part {ch_num}: {ch_title} - {story_raw.get('title', '')[:50]}"
-            }
-            visual_engine.render_reddit_card(card_info, card_png, aspect_ratio=aspect_ratio)
+            # Card Oficial do Reddit: Apenas na Parte 1 (Abertura do Vídeo)
+            is_opening_part = (idx == 0)
+            card_png = None
+            if is_opening_part:
+                card_png = os.path.join(cards_dir, "card_opening.png")
+                card_info = {
+                    "channel_name": "Reddit Minute",
+                    "score": story_raw.get("score", "38.2k"),
+                    "display_title": story_raw.get('title', 'Insane Reddit Story')
+                }
+                visual_engine.render_reddit_card(card_info, card_png, aspect_ratio=aspect_ratio)
 
             # Legendas dinâmicas ASS
             ass_path = os.path.join(chunks_dir, f"subtitles_part_{ch_num:02d}.ass")
@@ -154,11 +157,12 @@ def generate_25min_single_story_video(
             ok, out_path = render_reddit_story_video(
                 audio_path=seg_audio_path,
                 ass_subtitles_path=ass_path,
-                card_png_path=card_png,
+                card_png_path=card_png if is_opening_part else None,
                 output_video_path=ch_video_output,
                 background_video_path=bg_clip,
+                video_type="longform" if is_opening_part else "chunk",
                 aspect_ratio=aspect_ratio,
-                card_duration_sec=4.8,
+                card_duration_sec=4.8 if is_opening_part else 0.0,
                 status_callback=status_callback
             )
 

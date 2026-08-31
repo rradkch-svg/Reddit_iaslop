@@ -128,6 +128,7 @@ def run_reddit_story_pipeline(
             ass_subtitles_path=ass_shorts_path,
             card_png_path=card_9x16_png,
             output_video_path=video_shorts_output,
+            video_type="shorts",
             aspect_ratio="9:16",
             status_callback=status_callback
         )
@@ -147,6 +148,7 @@ def run_reddit_story_pipeline(
                 ass_subtitles_path=ass_16x9_path,
                 card_png_path=card_16x9_png,
                 output_video_path=video_16x9_output,
+                video_type="longform",
                 aspect_ratio="16:9",
                 status_callback=status_callback
             )
@@ -270,6 +272,7 @@ def generate_teaser_short_video(
             card_png_path=card_png,
             output_video_path=teaser_video_output,
             final_hook_png_path=final_hook_png,
+            video_type="teaser",
             aspect_ratio="9:16",
             card_duration_sec=4.8,
             final_hook_duration_sec=5.0,

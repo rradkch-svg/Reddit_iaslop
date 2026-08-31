@@ -44,56 +44,68 @@ class RedditVisualEngine:
         channel_name = card_data.get("channel_name", "Reddit Minute")
         time_ago = card_data.get("time_ago", "4h ago")
         score = card_data.get("score", "38.2k")
-        display_title = card_data.get("display_title", card_data.get("title", "Insane Reddit Story"))
+        display_title = (card_data.get("display_title") or card_data.get("title") or "Insane Reddit Story").strip()
 
-        # Dimensões e posicionamento do card central
+        # Dimensões e posicionamento do card central (Ocupa espaço maior e mais marcante na tela)
         if is_vertical:
-            card_w = 980
+            card_w = 1010
             card_x0 = (canvas_w - card_w) // 2
-            card_y0 = 320 # Posição superior/central limpa
-            title_font_size = 46
-            meta_font_size = 28
-            max_wrap_chars = 34
+            card_y0 = 360
+            title_font_size = 50
+            meta_font_size = 30
+            max_wrap_chars = 32
+            padding = 48
+            icon_size = 68
         else:
-            card_w = 1350
+            card_w = 1520
             card_x0 = (canvas_w - card_w) // 2
-            card_y0 = 220
-            title_font_size = 42
-            meta_font_size = 26
-            max_wrap_chars = 54
+            card_y0 = 180
+            title_font_size = 48
+            meta_font_size = 30
+            max_wrap_chars = 52
+            padding = 52
+            icon_size = 72
 
         font_sub = get_font(meta_font_size + 4, bold=True)
         font_meta = get_font(meta_font_size, bold=False)
         font_title = get_font(title_font_size, bold=True)
         font_pills = get_font(meta_font_size, bold=True)
 
-        # Quebra do título
+        # Quebra do título com limite seguro de linhas para evitar overflow
         title_lines = textwrap.wrap(display_title, width=max_wrap_chars)
+        if not title_lines:
+            title_lines = [display_title or "Insane Reddit Story"]
+        max_lines = 4 if not is_vertical else 5
+        if len(title_lines) > max_lines:
+            title_lines = title_lines[:max_lines]
+            if not title_lines[-1].endswith("..."):
+                title_lines[-1] = title_lines[-1].rstrip(".!? ") + "..."
+
         line_height = int(title_font_size * 1.35)
         title_block_h = len(title_lines) * line_height
 
-        header_h = 80
-        footer_h = 75
-        padding = 42
+        header_h = 86
+        footer_h = 80
         card_h = padding + header_h + title_block_h + padding + footer_h + padding
+        if card_y0 + card_h > canvas_h - 40:
+            card_y0 = max(20, (canvas_h - card_h) // 2)
         card_x1 = card_x0 + card_w
         card_y1 = card_y0 + card_h
 
         # 1. Sombra suave e profunda
-        shadow_box = [card_x0 - 16, card_y0 + 12, card_x1 + 16, card_y1 + 28]
+        shadow_box = [card_x0 - 18, card_y0 + 14, card_x1 + 18, card_y1 + 32]
         shadow_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
         s_draw = ImageDraw.Draw(shadow_layer)
-        s_draw.rounded_rectangle(shadow_box, radius=36, fill=(0, 0, 0, 220))
-        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(24))
+        s_draw.rounded_rectangle(shadow_box, radius=40, fill=(0, 0, 0, 230))
+        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(28))
         img = Image.alpha_composite(img, shadow_layer)
         draw = ImageDraw.Draw(img)
 
         # 2. Card Principal com Dark Theme Oficial do Reddit (#121213 / #1A1A1B)
         card_box = [card_x0, card_y0, card_x1, card_y1]
-        draw.rounded_rectangle(card_box, radius=28, fill=(18, 18, 19, 255), outline=(60, 62, 65, 255), width=3)
+        draw.rounded_rectangle(card_box, radius=32, fill=(18, 18, 19, 255), outline=(65, 68, 72, 255), width=4)
 
         # 3. Ícone do Canal (Avatar Circular a partir de icon.jpg)
-        icon_size = 58
         icon_x = card_x0 + padding
         icon_y = card_y0 + padding
         
