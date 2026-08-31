@@ -55,11 +55,11 @@ automotive-slop/
 │   └── backgrounds/             # Vídeos de gameplay 1080p60 HD
 │
 ├── checkpoint/                  # Checkpoints e vídeos masters gerados
-│   └── auto_batches/            # Estrutura oficial: batch_1, batch_2... (10 vídeos por lote)
-│       ├── batch_1/
-│       │   ├── video_0/ ... video_9/
-│       └── batch_2/
-│           ├── video_0/ ... video_9/
+│   └── auto_batches/            # Estrutura oficial: batch_1, batch_2... (10 slots por lote)
+│       └── batch_1/
+│           └── video_0/ ... video_9/
+│               ├── longform_25min/          # 🎬 Master Longform 25min (16:9) + 8 chunks + narration
+│               └── teaser_short/            # ⚡ Teaser Short (9:16) com Gancho Final de tela
 ```
 
 ---
@@ -76,17 +76,17 @@ automotive-slop/
 - **Painel Interativo (WebUI):**
   Execute `iniciar.bat` ou `scripts\iniciar_backend.bat` e acesse `http://localhost:8501`.
 
-- **Geração Automática Contínua em Lotes (10 vídeos por batch):**
+- **Geração Automática Contínua Dual (25min Master + Teaser Short por slot):**
   ```bash
-  python src/auto_pipeline.py --count 10
+  python src/auto_pipeline.py --mode dual --count 10
   ```
 
-- **Gerar Short 9:16 (até 2.5 min com CTA) no próximo slot do lote:**
+- **Gerar Teaser Short 9:16 com Gancho Final no próximo slot:**
   ```bash
   python -m src.reddit_pipeline --sub maliciouscompliance
   ```
 
-- **Gerar Vídeo Longo de 25 Minutos (História Única) no próximo slot do lote:**
+- **Gerar Vídeo Longo de 25 Minutos (História Única em 8 Capítulos):**
   ```bash
   python -m src.reddit_longform
   ```
@@ -96,7 +96,7 @@ automotive-slop/
   python src/auto_pipeline.py --status
   ```
 
-- **Executar Testes:**
+- **Executar Suíte de Testes:**
   ```bash
   python -m unittest discover -s tests
   ```

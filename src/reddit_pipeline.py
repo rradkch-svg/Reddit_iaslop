@@ -190,6 +190,119 @@ DETALHES DE PRODUÇÃO:
             "voice": voice_name
         }
 
+def generate_teaser_short_video(
+    story_raw: Dict[str, Any],
+    custom_output_dir: str,
+    teaser_data: Optional[Dict[str, Any]] = None,
+    persona: str = "male_dramatic",
+    voice_name: Optional[str] = None,
+    status_callback = None
+) -> Dict[str, Any]:
+    """
+    Gera um Teaser Short 9:16 vertical de alta retenção (60–90s) para atração no TikTok/Shorts:
+    - Gancho explosivo dos primeiros 3 segundos
+    - Narração da Parte 1 / Premissa central
+    - Card oficial do Reddit Minute nos primeiros 4.8s
+    - Legendas palavra por palavra estilo Hormozi
+    - Banner visual de Gancho Final nos últimos 5 segundos ('👉 FULL 25-MIN SAGA ON CHANNEL 🔗')
+    - CTA falado direcionando para o canal/vídeo completo
+    """
+    with LogSpan("generate_teaser_short_video"):
+        if os.path.basename(custom_output_dir).lower() == "teaser_short":
+            teaser_dir = custom_output_dir
+        else:
+            teaser_dir = os.path.join(custom_output_dir, "teaser_short")
+        os.makedirs(teaser_dir, exist_ok=True)
+
+        if not teaser_data:
+            director = RedditStoryDirectorAgent()
+            exp_data = director.expand_25min_single_story(story_raw)
+            teaser_data = exp_data.get("teaser_short", {})
+            if not teaser_data:
+                sc = director.optimize_story(story_raw)
+                teaser_data = {
+                    "title": f"{sc.get('title', story_raw.get('title', ''))} #Shorts",
+                    "hook_text": sc.get("hook_text", ""),
+                    "script": sc.get("shorts_script", ""),
+                    "final_hook_text": "👉 FULL 25-MIN SAGA ON CHANNEL 🔗",
+                    "tags": sc.get("tags", ["#RedditStories", "#Shorts"])
+                }
+
+        voice = voice_name or REDDIT_PERSONA_VOICES.get(persona, "en-US-ChristopherNeural")
+        audio_engine = RedditAudioEngine(voice=voice, rate="+20%")
+        audio_path = os.path.join(teaser_dir, "narration_teaser.mp3")
+
+        teaser_text = teaser_data.get("script", "")
+        words_timing = audio_engine.generate_speech(
+            text=teaser_text,
+            output_mp3=audio_path,
+            voice_name=voice
+        )
+
+        visual_engine = RedditVisualEngine()
+        card_png = os.path.join(teaser_dir, "reddit_card_9x16.png")
+        card_info = {
+            "channel_name": "Reddit Minute",
+            "score": story_raw.get("score", "38.2k"),
+            "display_title": teaser_data.get("title", story_raw.get("title", ""))[:65]
+        }
+        visual_engine.render_reddit_card(card_info, card_png, aspect_ratio="9:16")
+
+        # Banner visual de Gancho Final ("See More Here / Full 25-Min Saga")
+        final_hook_png = os.path.join(teaser_dir, "final_hook_badge.png")
+        hook_banner_text = teaser_data.get("final_hook_text", "👉 FULL 25-MIN SAGA ON CHANNEL 🔗")
+        visual_engine.render_final_hook_badge(
+            badge_text=hook_banner_text,
+            output_png=final_hook_png,
+            subtext="WATCH FULL SAGA ON YOUTUBE • LINK IN BIO 💬",
+            aspect_ratio="9:16"
+        )
+
+        # Legendas dinâmicas ASS
+        ass_path = os.path.join(teaser_dir, "subtitles_teaser.ass")
+        generate_reddit_ass_subtitles(words_timing, ass_path, aspect_ratio="9:16")
+
+        # Renderização do Teaser Short 9:16 com Gancho Final
+        teaser_video_output = os.path.join(teaser_dir, "teaser_short_9x16.mp4")
+        ok, out_path = render_reddit_story_video(
+            audio_path=audio_path,
+            ass_subtitles_path=ass_path,
+            card_png_path=card_png,
+            output_video_path=teaser_video_output,
+            final_hook_png_path=final_hook_png,
+            aspect_ratio="9:16",
+            card_duration_sec=4.8,
+            final_hook_duration_sec=5.0,
+            status_callback=status_callback
+        )
+
+        # Salva metadados e script
+        script_file = os.path.join(teaser_dir, "script_teaser.json")
+        with open(script_file, "w", encoding="utf-8") as f:
+            json.dump(teaser_data, f, indent=2, ensure_ascii=False)
+
+        metadata_file = os.path.join(teaser_dir, "metadata_teaser.txt")
+        meta_content = f"""TÍTULO DO TEASER SHORT:
+{teaser_data.get('title', story_raw.get('title', ''))}
+
+DESCRIÇÃO DO TEASER (CTA YOUTUBE):
+🔥 Assista à história completa de 25 minutos no canal Reddit Minute!
+🔗 Link completo na bio e nos comentários fixados.
+
+HASHTAGS:
+{" ".join(teaser_data.get('tags', ['#RedditStories', '#Shorts', '#RedditMinute']))}
+"""
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            f.write(meta_content)
+
+        return {
+            "success": ok,
+            "teaser_dir": teaser_dir,
+            "teaser_video": teaser_video_output,
+            "metadata_file": metadata_file,
+            "script_file": script_file
+        }
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Reddit Story Channel Video Generator (High CPM)")
     parser.add_argument("--sub", type=str, default="maliciouscompliance", help="Target subreddit")

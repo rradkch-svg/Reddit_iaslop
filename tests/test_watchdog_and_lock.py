@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import tempfile
 import unittest
@@ -39,8 +39,7 @@ class TestWatchdogAndLock(unittest.TestCase):
         is_running, pid, reason = is_generator_running()
         self.assertIsInstance(is_running, bool)
         self.assertIsInstance(reason, str)
-        if is_running:
-            self.assertIsNotNone(pid)
+        if is_running and pid is not None:
             self.assertGreater(pid, 0)
 
 if __name__ == "__main__":

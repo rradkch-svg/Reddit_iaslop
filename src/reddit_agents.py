@@ -291,6 +291,23 @@ class RedditStoryDirectorAgent:
                     ch_words.extend(pad_text.split())
                 ch["narration_text"] = " ".join(ch_words[:480])
 
+        # Gera Teaser Short vinculado para divulgação viral
+        first_ch = chapters[0].get("narration_text", "")
+        teaser_words = first_ch.split()[:140]
+        teaser_hook = (
+            f"{' '.join(teaser_words)} "
+            f"The boss thought he had won... until Monday morning cost the company tens of thousands in emergency overtime. "
+            f"Watch the full 25-minute deep-dive on our channel right now! See more in the description."
+        )
+        data["teaser_short"] = {
+            "title": f"{data.get('main_title', raw_post.get('title', ''))[:60]} #Shorts",
+            "hook_text": "They demanded total obedience. It cost them everything.",
+            "script": teaser_hook,
+            "final_hook_text": "👉 FULL 25-MIN SAGA ON CHANNEL 🔗",
+            "final_hook_spoken_cta": "Watch the full 25-minute story on our channel! Link in bio and description.",
+            "tags": ["#RedditStories", "#Shorts", "#RedditMinute", "#Viral"]
+        }
+
         return data
 
     def _generate_algorithmic_25min_story(
@@ -396,6 +413,15 @@ class RedditStoryDirectorAgent:
                 "narration_text": final_chapter_text
             })
 
+        # Teaser Short com gancho explosivo e final hook
+        teaser_script = (
+            f"{title}. Here is exactly how following my boss's orders to the exact letter resulted in a forty-two thousand dollar emergency meltdown. "
+            f"When management demanded strict handbook adherence with zero exceptions, I documented the warning and stepped aside. "
+            f"The system collapsed right on schedule, triggering triple overtime and emergency contractors. "
+            f"The boss thought he had won... until Monday morning when executive leadership demanded answers. "
+            f"Watch the full 25-minute deep-dive saga and the legal fallout on our channel right now! See more in the description."
+        )
+
         return {
             "main_title": f"{title} [25 MIN FULL STORY]",
             "persona": persona,
@@ -408,5 +434,13 @@ class RedditStoryDirectorAgent:
                 + f"\n\n💬 What would you have done? Leave a comment below!\n🔔 Subscribe to Reddit Minute for daily full-length Reddit stories!"
             ),
             "tags": ["#RedditStories", "#MaliciousCompliance", "#WorkplaceDrama", "#25MinStory", "#Documentary", "#Longform", "#RedditMinute"],
-            "chapters": chapters
+            "chapters": chapters,
+            "teaser_short": {
+                "title": f"{title[:55]} #Shorts",
+                "hook_text": "Following orders cost them $42,000.",
+                "script": teaser_script,
+                "final_hook_text": "👉 FULL 25-MIN SAGA ON CHANNEL 🔗",
+                "final_hook_spoken_cta": "Watch the full 25-minute saga on our channel right now! See more in description.",
+                "tags": ["#RedditStories", "#MaliciousCompliance", "#Shorts", "#RedditMinute"]
+            }
         }

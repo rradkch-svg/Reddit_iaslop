@@ -118,16 +118,34 @@ class TestAutoBatchesOrganization(unittest.TestCase):
         self.assertEqual(v_num, 0)
         self.assertTrue(target_dir.endswith(os.path.join("batch_3", "video_0")))
 
-    def test_video_slot_naming_convention(self):
-        """Verifica que o padrao de nomeclatura de pastas e estritamente batch_X e video_Y."""
+    def test_dual_slot_subfolders_completion(self):
+        """Verifica que o slot e reconhecido como concluido com as subpastas longform_25min e teaser_short."""
         mgr = BatchManager(base_dir=self.test_dir, batch_size=10)
-        for expected_batch in range(1, 4):
-            for expected_video in range(10):
-                target_dir, b_num, v_num = mgr.get_next_video_slot()
-                self.assertEqual(b_num, expected_batch)
-                self.assertEqual(v_num, expected_video)
-                # Simula conclusao do video
-                self._create_mock_video_slot(os.path.join(self.test_dir, f"batch_{expected_batch}"), f"video_{expected_video}")
+        v0_dir = os.path.join(self.test_dir, "batch_1", "video_0")
+        long_dir = os.path.join(v0_dir, "longform_25min")
+        teaser_dir = os.path.join(v0_dir, "teaser_short")
+        os.makedirs(long_dir, exist_ok=True)
+        os.makedirs(teaser_dir, exist_ok=True)
+
+        with open(os.path.join(long_dir, "longform_master_25min_16x9.mp4"), "wb") as f:
+            f.write(b"0" * 30000)
+        with open(os.path.join(teaser_dir, "teaser_short_9x16.mp4"), "wb") as f:
+            f.write(b"0" * 30000)
+
+        self.assertTrue(mgr.is_slot_completed(v0_dir))
+
+    def test_final_hook_badge_generation(self):
+        """Verifica a criacao correta do badge de gancho final (See more / Full Saga)."""
+        from src.reddit_visuals import RedditVisualEngine
+        visual_engine = RedditVisualEngine()
+        badge_path = os.path.join(self.test_dir, "final_hook_test.png")
+        out = visual_engine.render_final_hook_badge(
+            badge_text="👉 FULL 25-MIN SAGA ON CHANNEL 🔗",
+            output_png=badge_path,
+            aspect_ratio="9:16"
+        )
+        self.assertTrue(os.path.exists(badge_path))
+        self.assertGreater(os.path.getsize(badge_path), 5000)
 
 if __name__ == "__main__":
     unittest.main()

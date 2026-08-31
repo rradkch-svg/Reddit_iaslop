@@ -35,9 +35,7 @@ try:
     from .reddit_agents import RedditStoryDirectorAgent, PERSONA_VOICE_MAP, ENGAGEMENT_QUESTIONS
     from .reddit_audio import RedditAudioEngine, REDDIT_PERSONA_VOICES
     from .reddit_visuals import RedditVisualEngine
-    from .reddit_subtitles import generate_reddit_ass_subtitles
-    from .reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
-    from .reddit_pipeline import run_reddit_story_pipeline
+    from .reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
     from .reddit_longform import generate_25min_single_story_video
     from .batch_manager import BatchManager
 except ImportError:
@@ -58,7 +56,7 @@ except ImportError:
     from reddit_visuals import RedditVisualEngine
     from reddit_subtitles import generate_reddit_ass_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
-    from reddit_pipeline import run_reddit_story_pipeline
+    from reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
     from reddit_longform import generate_25min_single_story_video
     from batch_manager import BatchManager
 
@@ -226,6 +224,9 @@ with tab_longform:
             key="lf_sub_select"
         )
         target_mins = st.slider("Duração Alvo (Minutos):", min_value=20.0, max_value=30.0, value=25.0, step=1.0)
+    with col_lf2:
+        gen_teaser_check = st.checkbox("⚡ Gerar também o Teaser Short 9:16 (com Gancho Final)", value=True)
+        st.caption("Cria simultaneamente o clipe vertical promocional com badge '👉 FULL 25-MIN SAGA ON CHANNEL' e CTA de tela.")
 
     if st.button("🚀 Produzir Vídeo Épico de 25 Minutos (História Única)", type="primary", use_container_width=True):
         status_lf = st.empty()
@@ -242,17 +243,39 @@ with tab_longform:
                 target_duration_minutes=target_mins,
                 status_callback=cb_lf
             )
+            prog_lf.progress(70)
+
+            res_teaser = None
+            if gen_teaser_check:
+                cb_lf("⚡ Renderizando Teaser Short 9:16 com Gancho Final...")
+                res_teaser = generate_teaser_short_video(
+                    story_raw={"title": res_lf.get("title", ""), "subreddit": lf_sub, "body": ""},
+                    custom_output_dir=res_lf["work_dir"],
+                    teaser_data=res_lf.get("teaser_short_data"),
+                    status_callback=cb_lf
+                )
+
             prog_lf.progress(100)
             status_lf.success(f"🎉 Vídeo de {res_lf.get('total_duration_minutes', 25):.1f} minutos gerado com sucesso!")
 
-            if res_lf.get("output_video") and os.path.exists(res_lf["output_video"]):
+            if res_teaser and res_teaser.get("teaser_video") and os.path.exists(res_teaser["teaser_video"]):
+                v_col1, v_col2 = st.columns([1.6, 1])
+                with v_col1:
+                    st.markdown("#### 🎬 Master Longform 25 Minutos (16:9)")
+                    st.video(res_lf["output_video"])
+                    st.caption(f"Pasta: `{res_lf.get('longform_dir')}`")
+                with v_col2:
+                    st.markdown("#### ⚡ Teaser Short (9:16)")
+                    st.video(res_teaser["teaser_video"])
+                    st.caption(f"Pasta: `{res_teaser.get('teaser_dir')}`")
+            elif res_lf.get("output_video") and os.path.exists(res_lf["output_video"]):
                 st.video(res_lf["output_video"])
                 st.markdown(f"**Arquivo Master:** `{res_lf['output_video']}`")
                 
-                if os.path.exists(res_lf.get("metadata_file", "")):
-                    with open(res_lf["metadata_file"], "r", encoding="utf-8") as f:
-                        meta_txt = f.read()
-                    st.text_area("📋 Metadados e Timestamps do YouTube:", value=meta_txt, height=200)
+            if os.path.exists(res_lf.get("metadata_file", "")):
+                with open(res_lf["metadata_file"], "r", encoding="utf-8") as f:
+                    meta_txt = f.read()
+                st.text_area("📋 Metadados e Timestamps do YouTube:", value=meta_txt, height=200)
         except Exception as e:
             status_lf.error(f"Erro na produção do vídeo longo: {str(e)}")
 

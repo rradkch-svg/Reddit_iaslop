@@ -63,9 +63,20 @@ def generate_25min_single_story_video(
             # Organização oficial em batches (batch_1, batch_2...) com 10 vídeos por lote (video_0..video_9)
             mgr = BatchManager(base_dir=output_base_dir)
             work_dir, b_num, v_num = mgr.get_next_video_slot()
-        os.makedirs(work_dir, exist_ok=True)
 
-        app_logger.info(f"[Longform25Min] Iniciando produção de história única de 25 min para: '{story_raw.get('title')}'")
+        # Garante pasta dedicada longform_25min dentro do slot
+        if os.path.basename(work_dir).lower() == "longform_25min":
+            longform_dir = work_dir
+        else:
+            longform_dir = os.path.join(work_dir, "longform_25min")
+            
+        cards_dir = os.path.join(longform_dir, "cards")
+        chunks_dir = os.path.join(longform_dir, "chunks")
+        os.makedirs(longform_dir, exist_ok=True)
+        os.makedirs(cards_dir, exist_ok=True)
+        os.makedirs(chunks_dir, exist_ok=True)
+
+        app_logger.info(f"[Longform25Min] Iniciando produção de história única de 25 min para: '{story_raw.get('title')}' em {longform_dir}")
         if status_callback:
             status_callback(f"📖 Desenvolvendo narrativa profunda de 25 minutos: '{story_raw.get('title')[:40]}...'")
 
@@ -82,7 +93,7 @@ def generate_25min_single_story_video(
             raise ValueError("Nenhum capítulo retornado para a história de 25 minutos.")
 
         # Salva o roteiro completo estruturado
-        script_file = os.path.join(work_dir, "longform_story_data.json")
+        script_file = os.path.join(longform_dir, "script_data.json")
         with open(script_file, "w", encoding="utf-8") as f:
             json.dump(longform_data, f, indent=2, ensure_ascii=False)
 
@@ -98,9 +109,10 @@ def generate_25min_single_story_video(
 
         chapter_data = []
         chapter_video_files = []
+        chapter_audio_files = []
         accumulated_time = 0.0
 
-        # 4. Renderizar cada capítulo da história única
+        # 4. Renderizar cada capítulo da história única (Modular Chunking)
         for idx, ch in enumerate(chapters):
             ch_num = ch.get("chapter_num", idx + 1)
             ch_title = ch.get("chapter_title", f"Part {ch_num}")
@@ -110,16 +122,17 @@ def generate_25min_single_story_video(
                 status_callback(f"🎙️ Gravando Áudio e Card da Parte {ch_num}/8: {ch_title}...")
 
             # Áudio do capítulo
-            seg_audio_path = os.path.join(work_dir, f"audio_part_{ch_num:02d}.mp3")
+            seg_audio_path = os.path.join(chunks_dir, f"audio_part_{ch_num:02d}.mp3")
             words_timing = audio_engine.generate_speech(
                 text=ch_narration,
                 output_mp3=seg_audio_path,
                 voice_name=voice_name
             )
             seg_dur = get_media_duration(seg_audio_path, ffmpeg_bin)
+            chapter_audio_files.append(seg_audio_path)
 
             # Card Oficial do Reddit do Capítulo
-            card_png = os.path.join(work_dir, f"card_part_{ch_num:02d}.png")
+            card_png = os.path.join(cards_dir, f"card_part_{ch_num:02d}.png")
             card_info = {
                 "channel_name": "Reddit Minute",
                 "score": story_raw.get("score", "38.2k"),
@@ -128,15 +141,15 @@ def generate_25min_single_story_video(
             visual_engine.render_reddit_card(card_info, card_png, aspect_ratio=aspect_ratio)
 
             # Legendas dinâmicas ASS
-            ass_path = os.path.join(work_dir, f"subtitles_part_{ch_num:02d}.ass")
+            ass_path = os.path.join(chunks_dir, f"subtitles_part_{ch_num:02d}.ass")
             generate_reddit_ass_subtitles(words_timing, ass_path, aspect_ratio=aspect_ratio)
 
             # Seleciona clipe de fundo alternado
             bg_clip = orbital_clips[idx % len(orbital_clips)] if orbital_clips else None
-            ch_video_output = os.path.join(work_dir, f"part_{ch_num:02d}.mp4")
+            ch_video_output = os.path.join(chunks_dir, f"part_{ch_num:02d}.mp4")
 
             if status_callback:
-                status_callback(f"🎬 Renderizando vídeo da Parte {ch_num}/8 ({seg_dur:.0f}s)...")
+                status_callback(f"🎬 Renderizando chunk da Parte {ch_num}/8 ({seg_dur:.0f}s)...")
 
             ok, out_path = render_reddit_story_video(
                 audio_path=seg_audio_path,
@@ -165,17 +178,17 @@ def generate_25min_single_story_video(
         total_story_duration = accumulated_time
         app_logger.info(f"[Longform25Min] Todas as {len(chapter_video_files)} partes renderizadas! Duração total: {total_story_duration/60:.2f} min")
 
-        # 5. Concatenação ultrarrápida no Master 25 Minutos Final
+        # 5. Concatenação ultrarrápida no Master 25 Minutos Final (FFmpeg Demuxer - Stream Copy)
         if status_callback:
             status_callback(f"⚡ Consolidando Master Final de {total_story_duration/60:.1f} minutos...")
 
-        concat_txt = os.path.join(work_dir, "story_parts_concat.txt")
+        concat_txt = os.path.join(longform_dir, "story_parts_concat.txt")
         with open(concat_txt, "w", encoding="utf-8") as f:
             for cv in chapter_video_files:
                 safe_cv = os.path.abspath(cv).replace("\\", "/")
                 f.write(f"file '{safe_cv}'\n")
 
-        output_master_mp4 = os.path.join(work_dir, "reddit_story_25min_single_story_master.mp4")
+        output_master_mp4 = os.path.join(longform_dir, "longform_master_25min_16x9.mp4")
         cmd_concat = [
             ffmpeg_bin, "-y",
             "-f", "concat",
@@ -187,7 +200,27 @@ def generate_25min_single_story_video(
         subprocess.run(cmd_concat, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         app_logger.info(f"[Longform25Min] Master final gerado com sucesso: {output_master_mp4} ({os.path.getsize(output_master_mp4)} bytes)")
 
-        # 6. Metadados e Timestamps do YouTube para a História Única
+        # 6. Concatena os áudios individuais no arquivo narration_longform.mp3
+        master_audio_mp3 = os.path.join(longform_dir, "narration_longform.mp3")
+        concat_audio_txt = os.path.join(longform_dir, "audio_parts_concat.txt")
+        with open(concat_audio_txt, "w", encoding="utf-8") as f:
+            for ca in chapter_audio_files:
+                safe_ca = os.path.abspath(ca).replace("\\", "/")
+                f.write(f"file '{safe_ca}'\n")
+        cmd_concat_audio = [
+            ffmpeg_bin, "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_audio_txt,
+            "-c", "copy",
+            master_audio_mp3
+        ]
+        try:
+            subprocess.run(cmd_concat_audio, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+        # 7. Metadados e Timestamps do YouTube para a História Única
         timestamps_lines = []
         for ch in chapter_data:
             sec = int(ch["start_time_sec"])
@@ -197,7 +230,7 @@ def generate_25min_single_story_video(
             timestamps_lines.append(f"{ts_str} - Part {ch['part']}: {ch['title']}")
 
         timestamps_block = "\n".join(timestamps_lines)
-        metadata_path = os.path.join(work_dir, "metadata_youtube_25min_story.txt")
+        metadata_path = os.path.join(longform_dir, "metadata_youtube.txt")
         meta_content = f"""TÍTULO DO VÍDEO (ALTO CPM):
 {longform_data.get('main_title', story_raw.get('title', ''))}
 
@@ -225,11 +258,13 @@ HASHTAGS:
         return {
             "success": True,
             "work_dir": work_dir,
+            "longform_dir": longform_dir,
             "output_video": output_master_mp4,
             "metadata_file": metadata_path,
             "total_duration_minutes": round(total_story_duration / 60.0, 2),
             "total_chapters": len(chapter_data),
-            "title": longform_data.get("main_title")
+            "title": longform_data.get("main_title"),
+            "teaser_short_data": longform_data.get("teaser_short", {})
         }
 
 if __name__ == "__main__":

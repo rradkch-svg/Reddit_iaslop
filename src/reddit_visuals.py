@@ -181,3 +181,74 @@ class RedditVisualEngine:
         os.makedirs(os.path.dirname(os.path.abspath(output_png)), exist_ok=True)
         img.save(output_png, "PNG")
         return output_png
+
+    def render_final_hook_badge(
+        self,
+        badge_text: str,
+        output_png: str,
+        subtext: str = "WATCH FULL 25-MIN SAGA ON CHANNEL 🔗",
+        aspect_ratio: str = "9:16"
+    ) -> str:
+        """
+        Renderiza um banner / badge de Gancho Final ('See more here / Full Saga')
+        para ser sobreposto no final do vídeo Teaser Short com efeito luminoso.
+        """
+        is_vertical = (aspect_ratio == "9:16")
+        canvas_w = 1080 if is_vertical else 1920
+        canvas_h = 1920 if is_vertical else 1080
+
+        img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+
+        if is_vertical:
+            badge_w = 960
+            badge_h = 240
+            badge_x0 = (canvas_w - badge_w) // 2
+            badge_y0 = 1380 # Terço inferior acima da barra de navegação
+            font_main = get_font(42, bold=True)
+            font_sub = get_font(30, bold=True)
+        else:
+            badge_w = 1200
+            badge_h = 200
+            badge_x0 = (canvas_w - badge_w) // 2
+            badge_y0 = 740
+            font_main = get_font(46, bold=True)
+            font_sub = get_font(32, bold=True)
+
+        badge_x1 = badge_x0 + badge_w
+        badge_y1 = badge_y0 + badge_h
+
+        # 1. Sombra e Glow Neon
+        shadow_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+        s_draw = ImageDraw.Draw(shadow_layer)
+        s_box = [badge_x0 - 16, badge_y0 - 8, badge_x1 + 16, badge_y1 + 24]
+        s_draw.rounded_rectangle(s_box, radius=36, fill=(255, 69, 0, 160))
+        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(28))
+        img = Image.alpha_composite(img, shadow_layer)
+        draw = ImageDraw.Draw(img)
+
+        # 2. Container Glassmorphism com Borda Laranja Vibrante
+        draw.rounded_rectangle(
+            [badge_x0, badge_y0, badge_x1, badge_y1],
+            radius=30,
+            fill=(16, 17, 18, 245),
+            outline=(255, 69, 0, 255),
+            width=4
+        )
+
+        # 3. Texto Principal com Ícone de Alerta
+        main_msg = badge_text.upper() if badge_text else "👉 FULL 25-MIN SAGA ON CHANNEL 👈"
+        main_len = draw.textlength(main_msg, font=font_main)
+        main_x = badge_x0 + (badge_w - main_len) // 2
+        main_y = badge_y0 + 38
+        draw.text((main_x, main_y), main_msg, font=font_main, fill=(255, 229, 0, 255)) # Amarelo neon de alto contraste
+
+        # 4. Subtexto de Ação ("See more in comments / bio")
+        sub_msg = subtext.upper() if subtext else "PART 1 OF 8 • SEE MORE IN DESCRIPTION 💬"
+        sub_len = draw.textlength(sub_msg, font=font_sub)
+        sub_x = badge_x0 + (badge_w - sub_len) // 2
+        sub_y = main_y + 60
+        draw.text((sub_x, sub_y), sub_msg, font=font_sub, fill=(255, 255, 255, 255))
+
+        os.makedirs(os.path.dirname(os.path.abspath(output_png)), exist_ok=True)
+        img.save(output_png, "PNG")
+        return output_png

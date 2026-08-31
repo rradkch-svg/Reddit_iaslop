@@ -86,13 +86,16 @@ def render_reddit_story_video(
     card_png_path: str,
     output_video_path: str,
     background_video_path: Optional[str] = None,
+    final_hook_png_path: Optional[str] = None,
     aspect_ratio: str = "9:16",
     card_duration_sec: float = 4.8,
+    final_hook_duration_sec: float = 5.0,
     status_callback = None
 ) -> Tuple[bool, str]:
     """
     Renderiza o vídeo final com fundo de gameplay real em 1080p60fps,
-    Card oficial do Reddit em destaque por card_duration_sec e legendas dinâmicas palavra por palavra.
+    Card oficial do Reddit em destaque por card_duration_sec,
+    Gancho Final de tela (See More Here / Full 25-Min Story) nos últimos segundos e legendas dinâmicas palavra por palavra.
     """
     with LogSpan("render_reddit_story_video", extra={"output": output_video_path, "ratio": aspect_ratio}):
         ffmpeg_bin = find_ffmpeg_binary()
@@ -115,45 +118,91 @@ def render_reddit_story_video(
         if status_callback:
             status_callback(f"🎬 Compondo vídeo {aspect_ratio} 60fps com gameplay HD, Card do Reddit e Legendas...")
 
+        has_final_hook = bool(final_hook_png_path and os.path.exists(final_hook_png_path))
+        fade_in_hook = max(0.5, total_duration - final_hook_duration_sec)
+
         if bg_to_use and os.path.exists(bg_to_use):
             bg_input_args = ["-stream_loop", "-1", "-i", bg_to_use]
-            filter_complex = (
-                f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
-                f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
-                f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
-                f"[v_card]ass=filename='{safe_ass}'[vout]"
-            )
+            if has_final_hook:
+                filter_complex = (
+                    f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
+                    f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
+                    f"[2:v]format=rgba,fade=t=in:st={fade_in_hook:.2f}:d=0.4:alpha=1[hook_faded];"
+                    f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
+                    f"[v_card][hook_faded]overlay=0:0:enable='gte(t,{fade_in_hook:.2f})'[v_hook];"
+                    f"[v_hook]ass=filename='{safe_ass}'[vout]"
+                )
+            else:
+                filter_complex = (
+                    f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
+                    f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
+                    f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
+                    f"[v_card]ass=filename='{safe_ass}'[vout]"
+                )
         else:
             src_w = 540 if is_vertical else 960
             src_h = 960 if is_vertical else 540
             bg_input_args = ["-f", "lavfi", "-i", f"testsrc2=size={src_w}x{src_h}:rate=60"]
-            filter_complex = (
-                f"[0:v]scale={target_w}:{target_h}:flags=bicubic,eq=brightness=-0.32:contrast=1.25:saturation=1.4[bg];"
-                f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
-                f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
-                f"[v_card]ass=filename='{safe_ass}'[vout]"
-            )
+            if has_final_hook:
+                filter_complex = (
+                    f"[0:v]scale={target_w}:{target_h}:flags=bicubic,eq=brightness=-0.32:contrast=1.25:saturation=1.4[bg];"
+                    f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
+                    f"[2:v]format=rgba,fade=t=in:st={fade_in_hook:.2f}:d=0.4:alpha=1[hook_faded];"
+                    f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
+                    f"[v_card][hook_faded]overlay=0:0:enable='gte(t,{fade_in_hook:.2f})'[v_hook];"
+                    f"[v_hook]ass=filename='{safe_ass}'[vout]"
+                )
+            else:
+                filter_complex = (
+                    f"[0:v]scale={target_w}:{target_h}:flags=bicubic,eq=brightness=-0.32:contrast=1.25:saturation=1.4[bg];"
+                    f"[1:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st={fade_out_st:.2f}:d=0.4:alpha=1[card_faded];"
+                    f"[bg][card_faded]overlay=0:0:enable='between(t,0,{card_duration_sec:.2f})'[v_card];"
+                    f"[v_card]ass=filename='{safe_ass}'[vout]"
+                )
 
-        cmd = [
-            ffmpeg_bin, "-y",
-            *bg_input_args,
-            "-loop", "1", "-i", card_png_path,
-            "-i", audio_path,
-            "-filter_complex", filter_complex,
-            "-map", "[vout]",
-            "-map", "2:a",
-            "-t", f"{total_duration:.2f}",
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-crf", "18",
-            "-pix_fmt", "yuv420p",
-            "-r", "60",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-ar", "44100",
-            "-shortest",
-            output_video_path
-        ]
+        if has_final_hook:
+            cmd = [
+                ffmpeg_bin, "-y",
+                *bg_input_args,
+                "-loop", "1", "-i", card_png_path,
+                "-loop", "1", "-i", final_hook_png_path,
+                "-i", audio_path,
+                "-filter_complex", filter_complex,
+                "-map", "[vout]",
+                "-map", "3:a",
+                "-t", f"{total_duration:.2f}",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
+                "-r", "60",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-ar", "44100",
+                "-shortest",
+                output_video_path
+            ]
+        else:
+            cmd = [
+                ffmpeg_bin, "-y",
+                *bg_input_args,
+                "-loop", "1", "-i", card_png_path,
+                "-i", audio_path,
+                "-filter_complex", filter_complex,
+                "-map", "[vout]",
+                "-map", "2:a",
+                "-t", f"{total_duration:.2f}",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p",
+                "-r", "60",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-ar", "44100",
+                "-shortest",
+                output_video_path
+            ]
 
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
