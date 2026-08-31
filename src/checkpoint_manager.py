@@ -670,11 +670,90 @@ class CheckpointManager:
                     pass
             raise e
 
+    @staticmethod
+    def extract_story_metadata_from_folder(v_path: str, is_longform: bool) -> Optional[Dict[str, Any]]:
+        """
+        Extrai de forma resiliente metadados estruturados (tema, hook, body, etc.)
+        a partir de arquivos de roteiro (script_data.json) ou metadados (metadata.txt, etc.).
+        """
+        # 1. Procura script_data.json (prioridade estruturada)
+        script_candidates = [
+            os.path.join(v_path, "longform_25min", "script_data.json"),
+            os.path.join(v_path, "script_data.json"),
+            os.path.join(v_path, "teaser_short", "script_data.json"),
+        ] if is_longform else [
+            os.path.join(v_path, "script_data.json"),
+            os.path.join(v_path, "teaser_short", "script_data.json"),
+        ]
+
+        for sc_file in script_candidates:
+            if os.path.exists(sc_file):
+                try:
+                    with open(sc_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    title = data.get("tema") or data.get("title") or data.get("main_title") or data.get("titulo")
+                    if title:
+                        return {
+                            "tema": title,
+                            "core_entity": data.get("core_entity"),
+                            "hook": data.get("hook") or data.get("hook_text") or data.get("opening_hook", ""),
+                            "explicacao_tecnica": data.get("explicacao_tecnica") or data.get("body") or data.get("shorts_script") or data.get("longform_script", "")
+                        }
+                except Exception:
+                    pass
+
+        # 2. Procura metadata.txt / metadata_youtube.txt / metadata_teaser.txt
+        meta_candidates = [
+            os.path.join(v_path, "metadata.txt"),
+            os.path.join(v_path, "metadata_youtube.txt"),
+            os.path.join(v_path, "longform_25min", "metadata.txt"),
+            os.path.join(v_path, "longform_25min", "metadata_youtube.txt"),
+            os.path.join(v_path, "teaser_short", "metadata_teaser.txt")
+        ]
+
+        for mf in meta_candidates:
+            if os.path.exists(mf):
+                try:
+                    with open(mf, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+                    lines = [l.strip() for l in content.split("\n")]
+                    title = None
+                    hook = None
+                    body = None
+                    for idx, line in enumerate(lines):
+                        if not title and re.search(r"\b(T[ÍI]TULO|TITLE)\b", line, re.IGNORECASE):
+                            if ":" in line and len(line.split(":", 1)[1].strip()) > 3:
+                                title = line.split(":", 1)[1].strip()
+                            else:
+                                for next_line in lines[idx + 1: idx + 4]:
+                                    if next_line and not next_line.startswith("#") and not re.search(r"\b(DESCRI[ÇC][ÃA]O|DESCRIPTION)\b", next_line, re.IGNORECASE):
+                                        title = next_line
+                                        break
+                        if not hook and re.search(r"\b(GANCHO|HOOK)\b", line, re.IGNORECASE):
+                            if ":" in line and len(line.split(":", 1)[1].strip()) > 3:
+                                hook = line.split(":", 1)[1].strip()
+                        if not body and re.search(r"\b(DESCRI[ÇC][ÃA]O|DESCRIPTION)\b", line, re.IGNORECASE):
+                            for next_line in lines[idx + 1: idx + 5]:
+                                if next_line and not next_line.startswith("#") and not re.search(r"\b(HASHTAGS|TAGS)\b", next_line, re.IGNORECASE):
+                                    body = next_line
+                                    break
+
+                    if title:
+                        return {
+                            "tema": title,
+                            "hook": hook or "",
+                            "explicacao_tecnica": body or ""
+                        }
+                except Exception:
+                    pass
+
+        return None
+
     def sync_blacklists_from_batches(self, base_batches_dir: Optional[str] = None) -> Dict[str, int]:
         """
         Varre todos os diretórios de batches no disco (ex: checkpoint/auto_batches/batch_1/video_0..)
         e sincroniza os temas nas 2 Blacklists isoladas:
-        - video_0 (ou que possua subpasta longform_25min) -> blacklist_longform
+        - video_0 (ou que possua subpasta longform_25min / compilação) -> blacklist_longform
         - video_1..video_9 (ou teaser_short / shorts clássicos) -> blacklist_shorts
         Retorna a quantidade de itens adicionados em cada blacklist: {'shorts': N, 'longform': M}.
         """
@@ -693,59 +772,21 @@ class CheckpointManager:
         for base_p in search_dirs:
             if not os.path.exists(base_p):
                 continue
-            for b_name in os.listdir(base_p):
+            for b_name in sorted(os.listdir(base_p)):
                 b_path = os.path.join(base_p, b_name)
                 if not os.path.isdir(b_path) or not re.match(r"^batch_\d+$", b_name, re.IGNORECASE):
                     continue
 
-                for v_name in os.listdir(b_path):
+                for v_name in sorted(os.listdir(b_path)):
                     v_path = os.path.join(b_path, v_name)
                     if not os.path.isdir(v_path) or not re.match(r"^video_\d+$", v_name, re.IGNORECASE):
                         continue
 
-                    # Determina se é slot de Longform ou Short
                     m = re.match(r"^video_(\d+)$", v_name, re.IGNORECASE)
                     v_num = int(m.group(1)) if m else -1
                     is_longform = (v_num == 0) or os.path.exists(os.path.join(v_path, "longform_25min"))
 
-                    # Tenta ler script_data.json
-                    script_candidates = [
-                        os.path.join(v_path, "longform_25min", "script_data.json"),
-                        os.path.join(v_path, "script_data.json"),
-                        os.path.join(v_path, "teaser_short", "script_data.json")
-                    ] if is_longform else [
-                        os.path.join(v_path, "script_data.json")
-                    ]
-
-                    story_data = None
-                    for sc_file in script_candidates:
-                        if os.path.exists(sc_file):
-                            try:
-                                with open(sc_file, "r", encoding="utf-8") as f:
-                                    story_data = json.load(f)
-                                if story_data:
-                                    break
-                            except Exception:
-                                pass
-
-                    # Fallback: metadata.txt
-                    if not story_data:
-                        meta_candidates = [
-                            os.path.join(v_path, "metadata.txt"),
-                            os.path.join(v_path, "longform_25min", "metadata.txt")
-                        ]
-                        for mf in meta_candidates:
-                            if os.path.exists(mf):
-                                try:
-                                    with open(mf, "r", encoding="utf-8") as f:
-                                        lines = f.readlines()
-                                    title_line = [l.replace("TITULO:", "").replace("TITLE:", "").strip() for l in lines if l.startswith("TITULO:") or l.startswith("TITLE:")]
-                                    if title_line:
-                                        story_data = {"tema": title_line[0]}
-                                        break
-                                except Exception:
-                                    pass
-
+                    story_data = self.extract_story_metadata_from_folder(v_path, is_longform=is_longform)
                     if story_data:
                         v_type = "longform" if is_longform else "shorts"
                         raw_title = story_data.get("tema") or story_data.get("title") or story_data.get("titulo") or story_data.get("main_title") or ""
