@@ -1,0 +1,4 @@
+# Analytics export folder
+analytics/*.zip
+analytics/*.csv
+!analytics/.gitkeep

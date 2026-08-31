@@ -1,0 +1,88 @@
+{
+  "generated_at": "2026-08-27 12:36:25",
+  "text": "Por que o motor V10 do Lexus LFA gira tão rápido que a física quase não acompanha? A Yamaha e a Lexus gastaram dez anos para criar o lendário 1LR-GUE de 4.8 litros. Ele atinge 9.000 RPM em apenas 0.6 segundos, usando válvulas de titânio e bielas forjadas ultraleves. O som do escapamento foi afinado acusticamente como um instrumento musical de Fórmula 1. Mas me diz nos comentários: você prefere a sinfonia desse V10 aspirado ou o torque bruto de um Porsche Twin-Turbo?",
+  "engine": "Google Gemini 2.5 Flash Multimodal Generative TTS",
+  "total_options": 8,
+  "options": [
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Puck",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 25.59,
+      "file": "01_gemini_puck_natural.mp3",
+      "style": "Padrão de Documentário de Alta Naturalidade",
+      "description": "Puck (Voz Masculina Jovem & Dinâmica - Padrão)"
+    },
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Charon",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 31.51,
+      "file": "02_gemini_charon_natural.mp3",
+      "style": "Padrão de Documentário de Alta Naturalidade",
+      "description": "Charon (Voz Masculina Grave & Cinematográfica - Padrão)"
+    },
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Kore",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 30.61,
+      "file": "03_gemini_kore_natural.mp3",
+      "style": "Padrão de Documentário de Alta Naturalidade",
+      "description": "Kore (Voz Feminina Cristalina & Envolvente - Padrão)"
+    },
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Fenrir",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 48.25,
+      "file": "04_gemini_fenrir_natural.mp3",
+      "style": "Padrão de Documentário de Alta Naturalidade",
+      "description": "Fenrir (Voz Masculina Encorpada & Vigorosa - Padrão)"
+    },
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Aoede",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 37.04,
+      "file": "05_gemini_aoede_natural.mp3",
+      "style": "Padrão de Documentário de Alta Naturalidade",
+      "description": "Aoede (Voz Feminina Suave & Melódica - Padrão)"
+    },
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Puck",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 91.93,
+      "file": "06_gemini_puck_shorts_adrenalina.mp3",
+      "style": "Você é um criador de conteúdo jovem, hipnótico e enérgico para YouTube Shorts. Fale em ritmo acelerado e entusiasmado nos primeiros segundos para prender a atenção total.",
+      "description": "Puck — Preset Shorts & Adrenalina (Ritmo Acelerado 1.25x)"
+    },
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Charon",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 51.29,
+      "file": "07_gemini_charon_documentario_epico.mp3",
+      "style": "Você é um narrador de documentário automotivo de prestígio internacional (estilo BBC Top Gear). Use tom solene, autoritário, com pausas dramáticas de respiração.",
+      "description": "Charon — Preset Documentário Épico / BBC (Grave & Solene)"
+    },
+    {
+      "engine": "Google Gemini 2.5 Flash Generative TTS",
+      "voice": "Gemini Fenrir",
+      "voice_type": "Multimodal Neural Generative (AI Speech)",
+      "sample_rate": "24.0 kHz Studio",
+      "latency_sec": 25.89,
+      "file": "08_gemini_fenrir_entusiasta_ronco.mp3",
+      "style": "Você é um apaixonado por supercarros e velocidade. Fale com pura emoção e ênfase visceral na cavalaria, nas 9.000 RPM e no som do escape.",
+      "description": "Fenrir — Preset Entusiasta de Pista (Ênfase Visceral)"
+    }
+  ]
+}

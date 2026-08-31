@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment and API keys
+.env
+.env.*
+!.env.example
+gemini-api.txt
+*.key
+*.secret
+cookies.txt
+*cookie*.txt
+
+
+# Logs, checkpoints, and data
+logs/
+checkpoint/
+data/
+*.lock
+.pipeline.lock
+
+# Temporary and legacy test outputs
+project_*/
+test_output/
+test_output_new/
+test_comprehensive_output/
+benchmark_run_*/
+custom_project/
+*.mp4
+*.png
+*.ass
+*.mp3
+
+# Analytics ZIP exports
+analytics/*.zip
+analytics/*.csv
+!analytics/.gitkeep
+
+# TTS Benchmark Directory
+!testes-tts/
+!testes-tts/**

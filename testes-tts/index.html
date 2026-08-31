@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 Laboratório Google Gemini Generative TTS</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #151c2d;
+            --border-color: #26334d;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.2);
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 2.5rem 1.5rem;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        h1 {
+            font-size: 2.3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a78bfa, #c084fc, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.8rem;
+        }
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .script-box {
+            background: rgba(21, 28, 45, 0.8);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent);
+            border-radius: 8px;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        .script-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #a78bfa;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .script-content {
+            font-size: 0.98rem;
+            color: #e2e8f0;
+            font-style: italic;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
+            gap: 1.5rem;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: #3b4d75;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        .card-header {
+            padding: 1.2rem 1.2rem 0.8rem 1.2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .badge-idx {
+            font-weight: 800;
+            font-size: 0.85rem;
+            background: #0b0f19;
+            color: #a78bfa;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .title-text {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+        .badge-engine {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            background-color: rgba(139, 92, 246, 0.15);
+            color: #c084fc;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            white-space: nowrap;
+        }
+        .card-body {
+            padding: 0 1.2rem 1.2rem 1.2rem;
+        }
+        .meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+            padding-bottom: 0.6rem;
+            border-bottom: 1px solid rgba(38, 51, 77, 0.5);
+        }
+        .meta-row code {
+            background: #0b0f19;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            color: #cbd5e1;
+        }
+        .desc-text {
+            font-size: 0.88rem;
+            color: #94a3b8;
+            margin-bottom: 1rem;
+            min-height: 2.6em;
+        }
+        .audio-container {
+            background: #0b0f19;
+            padding: 0.6rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        audio {
+            width: 100%;
+            height: 38px;
+            filter: invert(0.9) hue-rotate(240deg);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌟 Laboratório Google Gemini Generative TTS</h1>
+            <p class="subtitle">
+                Galeria exclusiva contendo todas as vozes neurais e estilos de atuação gerados pelo Google Gemini 2.5 Flash.
+            </p>
+        </header>
+
+        <div class="script-box">
+            <div class="script-title">Texto Padronizado de Teste (Mecânica Pura & Telemetria)</div>
+            <div class="script-content">"Por que o motor V10 do Lexus LFA gira tão rápido que a física quase não acompanha? A Yamaha e a Lexus gastaram dez anos para criar o lendário 1LR-GUE de 4.8 litros. Ele atinge 9.000 RPM em apenas 0.6 segundos, usando válvulas de titânio e bielas forjadas ultraleves. O som do escapamento foi afinado acusticamente como um instrumento musical de Fórmula 1. Mas me diz nos comentários: você prefere a sinfonia desse V10 aspirado ou o torque bruto de um Porsche Twin-Turbo?"</div>
+        </div>
+
+        <div class="grid">
+            
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#01</span>
+                    <span class="title-text">Puck (Voz Masculina Jovem & Dinâmica - Padrão)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Puck</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 25.59s</span>
+                </div>
+                <p class="desc-text">Padrão de Documentário de Alta Naturalidade</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="01_gemini_puck_natural.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#02</span>
+                    <span class="title-text">Charon (Voz Masculina Grave & Cinematográfica - Padrão)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Charon</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 31.51s</span>
+                </div>
+                <p class="desc-text">Padrão de Documentário de Alta Naturalidade</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="02_gemini_charon_natural.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#03</span>
+                    <span class="title-text">Kore (Voz Feminina Cristalina & Envolvente - Padrão)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Kore</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 30.61s</span>
+                </div>
+                <p class="desc-text">Padrão de Documentário de Alta Naturalidade</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="03_gemini_kore_natural.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#04</span>
+                    <span class="title-text">Fenrir (Voz Masculina Encorpada & Vigorosa - Padrão)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Fenrir</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 48.25s</span>
+                </div>
+                <p class="desc-text">Padrão de Documentário de Alta Naturalidade</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="04_gemini_fenrir_natural.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#05</span>
+                    <span class="title-text">Aoede (Voz Feminina Suave & Melódica - Padrão)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Aoede</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 37.04s</span>
+                </div>
+                <p class="desc-text">Padrão de Documentário de Alta Naturalidade</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="05_gemini_aoede_natural.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#06</span>
+                    <span class="title-text">Puck — Preset Shorts & Adrenalina (Ritmo Acelerado 1.25x)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Puck</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 91.93s</span>
+                </div>
+                <p class="desc-text">Você é um criador de conteúdo jovem, hipnótico e enérgico para YouTube Shorts. Fale em ritmo acelerado e entusiasmado nos primeiros segundos para prender a atenção total.</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="06_gemini_puck_shorts_adrenalina.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#07</span>
+                    <span class="title-text">Charon — Preset Documentário Épico / BBC (Grave & Solene)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Charon</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 51.29s</span>
+                </div>
+                <p class="desc-text">Você é um narrador de documentário automotivo de prestígio internacional (estilo BBC Top Gear). Use tom solene, autoritário, com pausas dramáticas de respiração.</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="07_gemini_charon_documentario_epico.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="badge-idx">#08</span>
+                    <span class="title-text">Fenrir — Preset Entusiasta de Pista (Ênfase Visceral)</span>
+                </div>
+                <span class="badge-engine">
+                    Google Gemini 2.5 Flash
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="meta-row">
+                    <span><strong>Voz Base:</strong> <code>Gemini Fenrir</code></span>
+                    <span><strong>Fidelidade:</strong> 24.0 kHz Studio</span>
+                    <span><strong>Latência:</strong> 25.89s</span>
+                </div>
+                <p class="desc-text">Você é um apaixonado por supercarros e velocidade. Fale com pura emoção e ênfase visceral na cavalaria, nas 9.000 RPM e no som do escape.</p>
+                <div class="audio-container">
+                    <audio controls preload="metadata">
+                        <source src="08_gemini_fenrir_entusiasta_ronco.mp3" type="audio/mpeg">
+                        Seu navegador não suporta áudio HTML5.
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        </div>
+    </div>
+</body>
+</html>

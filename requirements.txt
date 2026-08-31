@@ -1,0 +1,8 @@
+streamlit
+google-genai
+edge-tts
+yt-dlp
+pillow
+python-dotenv
+moviepy
+psutil
