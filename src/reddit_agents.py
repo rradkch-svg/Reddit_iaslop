@@ -565,3 +565,133 @@ class RedditStoryDirectorAgent:
                 "tags": ["#RedditStories", "#MaliciousCompliance", "#Shorts", "#RedditMinute"]
             }
         }
+
+    def synthesize_authentic_reddit_post(
+        self,
+        subreddit: str = "r/maliciouscompliance",
+        topic_hint: Optional[str] = None,
+        cooldown_callback = None,
+        status_callback = None
+    ) -> Dict[str, Any]:
+        """
+        Gera uma postagem INÉDITA do Reddit via Gemini AI exatamente no molde e estilo autêntico do Reddit,
+        sem depender de nenhum banco estático pré-gravado.
+        """
+        clean_sub = subreddit if subreddit.startswith("r/") else f"r/{subreddit.strip()}"
+        with LogSpan("RedditStoryDirectorAgent.synthesize_authentic_reddit_post", extra={"subreddit": clean_sub}):
+            configured_keys = resolve_gemini_api_keys(self.api_keys)
+
+            creation_system_instruction = (
+                f"You are an authentic, experienced Reddit user and viral storyteller writing a real-to-life post for {clean_sub}.\n"
+                f"Your goal is to write a 100% realistic, highly engaging post in the EXACT MOLD, tone, and formatting of top posts on this subreddit.\n\n"
+                f"AUTHENTIC REDDIT RULES:\n"
+                f"1. RAW & BELIEVABLE: Write in natural first-person English ('I', 'my boss', 'my landlord', 'my team'). Include specific, believable details (exact dollar amounts like $42,000, realistic corporate policies, lease terms, HOA bylaws, or workplace dynamics).\n"
+                f"2. NO AI CLICHÉS OR MORALIZING: Do NOT say 'little did they know' or 'justice was served'. Write like a real person recounting an infuriating conflict, their calculated compliance/revenge, and the satisfying, realistic fallout.\n"
+                f"3. STRUCTURE:\n"
+                f"   - Title: Punchy high-impact Reddit post title with numbers or stark conflict (under 95 chars).\n"
+                f"   - Author: Realistic Reddit username (e.g. 'u/Throwaway_SysAdmin99', 'u/LeaseFighter_24').\n"
+                f"   - Upvotes / Score: Realistic score (e.g. '34.2k').\n"
+                f"   - Body: Multi-paragraph engaging post body (350 to 600 words) detailing the context, the unreasonable demand, the response, and the fallout.\n\n"
+                f"OUTPUT JSON SCHEMA:\n"
+                f"{{\n"
+                f"  \"id\": \"post_unique_id\",\n"
+                f"  \"subreddit\": \"{clean_sub}\",\n"
+                f"  \"title\": \"Exact authentic Reddit post title\",\n"
+                f"  \"author\": \"u/RealisticUsername\",\n"
+                f"  \"score\": \"32.4k\",\n"
+                f"  \"upvote_ratio\": \"98%\",\n"
+                f"  \"body\": \"Full multi-paragraph post text...\"\n"
+                f"}}"
+            )
+
+            hint_text = f"\nSpecific Theme / Conflict hint: {topic_hint}" if topic_hint else ""
+            prompt = (
+                f"Write a brand-new, ultra-realistic, viral post for {clean_sub}. Make it high-stakes, satisfying, and completely in the style of top posts from this subreddit.{hint_text}\nReturn strictly JSON."
+            )
+
+            if configured_keys and any(len(k) >= 20 for k in configured_keys):
+                try:
+                    raw_text = generate_with_resilience(
+                        prompt=prompt,
+                        system_instruction=creation_system_instruction,
+                        model_name=self.model_name,
+                        fallback_models=self.fallback_models,
+                        auto_fallback=self.auto_fallback,
+                        auto_cooldown=self.auto_cooldown,
+                        response_mime_type="application/json",
+                        cooldown_callback=cooldown_callback,
+                        status_callback=status_callback,
+                        api_keys=self.api_keys
+                    )
+                    data = json.loads(raw_text)
+                    data["subreddit"] = clean_sub
+                    if "title" in data and "body" in data:
+                        app_logger.info(f"[RedditAgents] História inédita sintetizada com sucesso pelo Gemini para {clean_sub}: '{data.get('title')[:50]}...'")
+                        return data
+                except Exception as e:
+                    app_logger.warning(f"[RedditAgents] Falha na síntese via Gemini ({e}). Usando gerador procedural dinâmico...")
+
+            return self._procedurally_generate_reddit_post(clean_sub)
+
+    def _procedurally_generate_reddit_post(self, subreddit: str) -> Dict[str, Any]:
+        """Gera dinamicamente uma história no molde do Reddit sem nenhum banco estático fixo."""
+        clean_sub = subreddit if subreddit.startswith("r/") else f"r/{subreddit.strip()}"
+        cost = random.choice([38000, 42000, 65000, 89000, 140000, 210000])
+        roles = [
+            ("senior cloud architect", "regional director", "server migration"),
+            ("lead manufacturing technician", "plant manager", "cooling pump valve"),
+            ("logistics database specialist", "operations supervisor", "inventory reconciling script"),
+            ("network infrastructure engineer", "department head", "firewall security patch")
+        ]
+        role, boss, tech = random.choice(roles)
+        post_id = f"synth_{int(time.time())}_{random.randint(1000, 9999)}"
+
+        if "pettyrevenge" in clean_sub.lower() or "revenge" in clean_sub.lower():
+            title = f"Entitled neighbor blocked my driveway daily. City zoning laws cost him ${cost:,} to demolish his illegal addition."
+            body = (
+                f"I lived in a quiet suburban neighborhood for five years without issues until a new neighbor moved in next door. "
+                f"From his very first week, he treated my private driveway as his personal parking spot for his oversized commercial van. "
+                f"Whenever I asked him politely to move so I could leave for work, he would wave me off and tell me: 'You can wait ten minutes, the street is public property.'\n\n"
+                f"I documented every single violation with date-stamped 4K security footage for three months. When he decided to pour concrete "
+                f"and build a two-story guest suite extension that crossed four feet over my surveyed property line, I didn't yell or confront him. "
+                f"I hired a certified land surveyor and submitted the official deed blueprint directly to the city building inspection board.\n\n"
+                f"The city issued an immediate stop-work order and cited him for building without municipal permits across property boundaries. "
+                f"The administrative judge ordered a mandatory court-enforced demolition within thirty days at his sole expense. "
+                f"The contractor demolition and city fines cost him over {cost:,} dollars. He had to park his van three blocks away for the rest of his lease."
+            )
+        elif "aitah" in clean_sub.lower() or "relationship" in clean_sub.lower():
+            title = f"AITA for refusing to give my sister the ${cost:,} inheritance our grandfather left exclusively to me?"
+            body = (
+                f"For the past four years, I was the sole caregiver for our grandfather while he battled severe mobility issues. "
+                f"My sister moved across the country and refused to visit or contribute a single dime to his medical care, claiming she was 'too busy with her career.'\n\n"
+                f"When my grandfather passed away peacefully, his verified will designated his estate and ${cost:,} in investments directly to me "
+                f"to cover my student loans and lost career years. The day after the funeral, my sister showed up at my house demanding an immediate fifty-fifty split, "
+                f"claiming that as the oldest sibling she was legally entitled to half. When I refused, she sent our entire extended family after me "
+                f"with harassing group messages calling me selfish and manipulative.\n\n"
+                f"My lawyer confirmed the trust and will are airtight and cannot be contested. I told her that if she contacts me again, I will file a formal restraining order. "
+                f"Now half the family is refusing to speak to me."
+            )
+        else:
+            title = f"Boss demanded I follow the employee handbook to the exact letter. It cost the company ${cost:,} in emergency overtime."
+            body = (
+                f"I worked as a {role} at a facility operating around the clock. A newly appointed {boss} announced that effective immediately, "
+                f"no employee was permitted to touch the {tech} or perform preventative maintenance without a written authorization memo personally signed by him.\n\n"
+                f"I warned him that if we didn't bleed the system within twenty minutes of a sensor warning, the entire production floor would automatically shut down. "
+                f"He slammed his desk and said: 'You are paid to follow procedure, not make decisions. If you touch a valve without my signature, you are fired.'\n\n"
+                f"On Friday at 4:55 PM, the primary sensor tripped. I drafted the official authorization memo and walked to his office, but he had already clocked out "
+                f"for his long weekend with his phone turned off. Per his strict written mandate, my team and I clocked into mandatory emergency standby. "
+                f"For sixty straight hours, the entire line remained halted while we sat in the breakroom getting paid double-time holiday rates.\n\n"
+                f"When the vice president arrived on Monday morning, the shutdown and emergency contractor fees totaled {cost:,} dollars. "
+                f"When asked why I didn't restart the system, I handed executive leadership the signed policy memo. The {boss} was terminated before lunch."
+            )
+
+        return {
+            "id": post_id,
+            "subreddit": clean_sub,
+            "title": title,
+            "author": f"u/Throwaway_Reddit_{random.randint(100, 999)}",
+            "score": f"{random.randint(22, 48)}.{random.randint(1, 9)}k",
+            "upvote_ratio": f"{random.randint(96, 99)}%",
+            "body": body
+        }
+

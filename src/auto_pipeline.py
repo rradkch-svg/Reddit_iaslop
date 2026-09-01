@@ -103,7 +103,8 @@ except Exception:
 
 try:
     from .logger import app_logger, LogSpan
-    from .reddit_scraper import HIGH_CPM_SUBREDDITS, EXPANDED_HIGH_CPM_STORIES, fetch_top_high_cpm_stories
+    from .reddit_scraper import HIGH_CPM_SUBREDDITS, fetch_top_high_cpm_stories
+    from .reddit_agents import RedditStoryDirectorAgent
     from .reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
     from .reddit_longform import generate_25min_single_story_video
     from .gemini_client import DEFAULT_FALLBACK_MODELS, resolve_gemini_api_keys
@@ -111,12 +112,14 @@ try:
     from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
 except ImportError:
     from logger import app_logger, LogSpan
-    from reddit_scraper import HIGH_CPM_SUBREDDITS, EXPANDED_HIGH_CPM_STORIES, fetch_top_high_cpm_stories
+    from reddit_scraper import HIGH_CPM_SUBREDDITS, fetch_top_high_cpm_stories
+    from reddit_agents import RedditStoryDirectorAgent
     from reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
     from reddit_longform import generate_25min_single_story_video
     from gemini_client import DEFAULT_FALLBACK_MODELS, resolve_gemini_api_keys
     from batch_manager import BatchManager
     from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
+
 
 import random
 
@@ -162,9 +165,6 @@ class RedditAutoPipelineRunner:
         self.checkpoint_manager.sync_blacklists_from_batches()
 
         stories = fetch_top_high_cpm_stories(subreddits=self.target_subreddits, max_stories=max(count * 3, 20))
-        if not stories:
-            stories = list(EXPANDED_HIGH_CPM_STORIES)
-
         story_idx = 0
         completed = 0
         while RUNNING and completed < count:
@@ -186,26 +186,17 @@ class RedditAutoPipelineRunner:
                 selected_story = candidate
                 break
 
-            # Se esgotou a lista de histórias, busca mais
+            # Se esgotou a lista de histórias, sintetiza uma nova via Gemini AI no molde do Reddit
             if not selected_story:
-                print(f"📡 Buscando lote adicional de histórias no Reddit...")
-                more_stories = fetch_top_high_cpm_stories(subreddits=self.target_subreddits, max_stories=20)
-                new_stories = [s for s in more_stories if s not in stories]
-                if new_stories:
-                    stories.extend(new_stories)
-                    continue
-                else:
-                    # Fallback para histórias expandidas
-                    for fallback in EXPANDED_HIGH_CPM_STORIES:
-                        is_dup, _ = self.checkpoint_manager.is_in_blacklist(fallback, video_type=target_video_type)
-                        if not is_dup:
-                            selected_story = fallback
-                            break
-                    if not selected_story:
-                        selected_story = random.choice(EXPANDED_HIGH_CPM_STORIES)
+                print(f"🧠 Sintetizando nova história autêntica via Gemini IA para o Reddit Minute...")
+                director = RedditStoryDirectorAgent()
+                chosen_sub = random.choice(self.target_subreddits)
+                selected_story = director.synthesize_authentic_reddit_post(subreddit=f"r/{chosen_sub}")
+                stories.append(selected_story)
 
             sub = selected_story.get("subreddit", "reddit")
             title = selected_story.get("title", "")[:45]
+
 
             if is_video_0:
                 print(f"\n🌟 [{completed+1}/{count}] Slot Especial: {batch_name}/{video_name} ({sub}) ➔ PRODUZINDO FORMATO DUAL (Longform 25min + Teaser Short)...")

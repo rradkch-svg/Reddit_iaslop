@@ -1,6 +1,5 @@
 import unittest
 from src.reddit_agents import RedditStoryDirectorAgent, ENGAGEMENT_QUESTIONS
-from src.reddit_scraper import EXPANDED_HIGH_CPM_STORIES
 
 class TestShortsScriptCTA(unittest.TestCase):
     def test_shorts_duration_and_cta(self):
@@ -11,9 +10,12 @@ class TestShortsScriptCTA(unittest.TestCase):
         3. Terminam em pontuação válida sem corte abrupto de frases no meio.
         """
         director = RedditStoryDirectorAgent()
+        sample_subs = ["r/maliciouscompliance", "r/pettyrevenge", "r/AITAH"]
         
-        for story in EXPANDED_HIGH_CPM_STORIES[:3]:
+        for sub in sample_subs:
+            story = director.synthesize_authentic_reddit_post(sub)
             script_data = director._generate_algorithmic_fallback_script(story)
+
             shorts_text = script_data.get("shorts_script", "").strip()
             
             word_count = len(shorts_text.split())

@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Tuple, Optional
 
 try:
     from .logger import app_logger, LogSpan
-    from .reddit_scraper import EXPANDED_HIGH_CPM_STORIES, fetch_top_high_cpm_stories
+    from .reddit_scraper import fetch_top_high_cpm_stories
     from .reddit_agents import RedditStoryDirectorAgent, PERSONA_VOICE_MAP
     from .reddit_audio import RedditAudioEngine
     from .reddit_visuals import RedditVisualEngine
@@ -18,7 +18,7 @@ try:
     from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
 except ImportError:
     from logger import app_logger, LogSpan
-    from reddit_scraper import EXPANDED_HIGH_CPM_STORIES, fetch_top_high_cpm_stories
+    from reddit_scraper import fetch_top_high_cpm_stories
     from reddit_agents import RedditStoryDirectorAgent, PERSONA_VOICE_MAP
     from reddit_audio import RedditAudioEngine
     from reddit_visuals import RedditVisualEngine
@@ -26,6 +26,7 @@ except ImportError:
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from batch_manager import BatchManager
     from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
+
 
 def generate_25min_single_story_video(
     target_subreddit: Optional[str] = None,
@@ -56,8 +57,9 @@ def generate_25min_single_story_video(
             story_raw = custom_post
         else:
             subs = [target_subreddit] if target_subreddit else None
-            candidates = fetch_top_high_cpm_stories(subreddits=subs, max_stories=3)
-            story_raw = candidates[0] if candidates else EXPANDED_HIGH_CPM_STORIES[0]
+            candidates = fetch_top_high_cpm_stories(subreddits=subs, max_stories=1)
+            story_raw = candidates[0]
+
 
         if custom_output_dir:
             work_dir = os.path.abspath(custom_output_dir)

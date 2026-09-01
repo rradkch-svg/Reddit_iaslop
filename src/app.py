@@ -28,7 +28,6 @@ try:
     from .logger import app_logger, LogSpan
     from .reddit_scraper import (
         HIGH_CPM_SUBREDDITS,
-        EXPANDED_HIGH_CPM_STORIES,
         scrape_subreddit_rss,
         fetch_top_high_cpm_stories
     )
@@ -48,7 +47,6 @@ except ImportError:
     from logger import app_logger, LogSpan
     from reddit_scraper import (
         HIGH_CPM_SUBREDDITS,
-        EXPANDED_HIGH_CPM_STORIES,
         scrape_subreddit_rss,
         fetch_top_high_cpm_stories
     )
@@ -58,6 +56,7 @@ except ImportError:
     from reddit_subtitles import generate_reddit_ass_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
+
     from reddit_longform import generate_25min_single_story_video
     from batch_manager import BatchManager
     from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
@@ -382,7 +381,9 @@ with tab_scraper:
         with st.spinner(f"Raspando r/{scrape_sub}..."):
             posts = scrape_subreddit_rss(subreddit=scrape_sub, time_filter="month", limit=8)
             if not posts:
-                posts = [s for s in EXPANDED_HIGH_CPM_STORIES if scrape_sub in s["subreddit"].lower()]
+                director = RedditStoryDirectorAgent()
+                posts = [director.synthesize_authentic_reddit_post(subreddit=f"r/{scrape_sub}")]
+
 
             st.session_state["scraped_posts"] = posts
 
