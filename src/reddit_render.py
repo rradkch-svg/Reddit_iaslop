@@ -41,7 +41,7 @@ def get_media_duration(file_path: str, ffmpeg_bin: Optional[str] = None) -> floa
     return 45.0
 
 def get_best_orbital_background(aspect_ratio: str = "9:16") -> Optional[str]:
-    """Localiza o melhor vídeo de gameplay em assets/backgrounds."""
+    """Localiza o melhor vídeo de gameplay (priorizando Minecraft) em assets/backgrounds."""
     is_vertical = (aspect_ratio == "9:16")
     bg_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "backgrounds")
     
@@ -50,18 +50,29 @@ def get_best_orbital_background(aspect_ratio: str = "9:16") -> Optional[str]:
         fn = os.path.basename(f).lower()
         if is_vertical:
             if "vertical" in fn or "p9xlr1bobyw" in fn or "lkx3805bia8" in fn or "xlze_oo4wqs" in fn:
-                candidates.append(f)
+                # Prioritize Minecraft parkour first
+                score = 2 if "minecraft" in fn else 1
+                candidates.append((score, f))
         else:
             if "horizontal" in fn or "u7ieztmf" in fn or "erilpuq5yms" in fn or "64dw7xvh" in fn:
-                candidates.append(f)
+                score = 2 if "minecraft" in fn else 1
+                candidates.append((score, f))
 
     if not candidates:
-        candidates = glob.glob(os.path.join(bg_dir, "*.mp4"))
+        for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
+            fn = os.path.basename(f).lower()
+            score = 2 if "minecraft" in fn else 1
+            candidates.append((score, f))
 
-    return candidates[0] if candidates else None
+    if not candidates:
+        return None
+
+    # Sort by highest score first (Minecraft gameplay first)
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
 
 def get_orbital_backgrounds(aspect_ratio: str = "16:9") -> List[str]:
-    """Retorna lista de vídeos de gameplay disponíveis em assets/backgrounds."""
+    """Retorna lista de vídeos de gameplay disponíveis em assets/backgrounds com Minecraft priorizado."""
     is_vertical = (aspect_ratio == "9:16")
     bg_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "backgrounds")
     
@@ -70,15 +81,21 @@ def get_orbital_backgrounds(aspect_ratio: str = "16:9") -> List[str]:
         fn = os.path.basename(f).lower()
         if is_vertical:
             if "vertical" in fn or "p9xlr1bobyw" in fn or "lkx3805bia8" in fn or "xlze_oo4wqs" in fn:
-                candidates.append(f)
+                score = 2 if "minecraft" in fn else 1
+                candidates.append((score, f))
         else:
             if "horizontal" in fn or "u7ieztmf" in fn or "erilpuq5yms" in fn or "64dw7xvh" in fn:
-                candidates.append(f)
+                score = 2 if "minecraft" in fn else 1
+                candidates.append((score, f))
 
     if not candidates:
-        candidates = glob.glob(os.path.join(bg_dir, "*.mp4"))
+        for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
+            fn = os.path.basename(f).lower()
+            score = 2 if "minecraft" in fn else 1
+            candidates.append((score, f))
 
-    return candidates
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return [c[1] for c in candidates]
 
 def render_reddit_story_video(
     audio_path: str,

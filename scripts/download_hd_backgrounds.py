@@ -81,11 +81,11 @@ def download_hd_videos():
         "format": "bestvideo[height>=1080][fps>=50]+bestaudio/bestvideo[height>=1080]+bestaudio/bestvideo[height>=720]+bestaudio/best",
         "merge_output_format": "mp4",
         "ffmpeg_location": ff_exe,
-        "cookiesfrombrowser": ("firefox", None, None, None),
         "noplaylist": True,
         "quiet": False,
         "socket_timeout": 30
     }
+
 
     print("\n[DownloadHD] Iniciando download de backgrounds de gameplay em 1080p60 HD...")
     for item in BACKGROUND_VIDEOS:

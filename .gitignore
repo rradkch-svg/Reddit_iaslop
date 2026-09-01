@@ -12,6 +12,7 @@ gemini-api.txt
 *.secret
 cookies.txt
 *cookie*.txt
+*.sqlite
 
 # Logs, checkpoints, and data
 logs/
