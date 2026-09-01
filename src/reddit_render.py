@@ -163,11 +163,16 @@ def render_reddit_story_video(
         inputs = []
         if bg_to_use and os.path.exists(bg_to_use):
             bg_dur = get_media_duration(bg_to_use, ffmpeg_bin)
-            if bg_dur > 5.0:
-                max_seek = max(0.0, bg_dur - total_duration - 1.0)
-                random_ss = random.uniform(0.0, max_seek) if max_seek > 1.0 else random.uniform(0.0, bg_dur * 0.7)
-                inputs.extend(["-ss", f"{random_ss:.2f}"])
-            inputs.extend(["-stream_loop", "-1", "-i", bg_to_use])
+            if bg_dur >= (total_duration + 2.0):
+                # Se o vídeo de fundo é maior que a duração total, escolhe um ponto aleatório
+                # garantindo que nunca atinja o final do arquivo (reprodução 100% contínua sem repetições)
+                max_start = max(0.0, bg_dur - total_duration - 1.0)
+                random_start = random.uniform(0.0, max_start)
+                inputs.extend(["-ss", f"{random_start:.2f}", "-i", bg_to_use])
+            else:
+                # Se o vídeo de fundo for mais curto que o áudio, inicia em 00:00 e faz loop completo
+                # evitando loops de fragmentos curtos no final
+                inputs.extend(["-stream_loop", "-1", "-i", bg_to_use])
             bg_filter = f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
         else:
             src_w = 1080 if is_vertical else 1920
