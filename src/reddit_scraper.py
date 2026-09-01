@@ -52,7 +52,7 @@ def clean_reddit_text(raw_text: str) -> str:
 
 def scrape_subreddit_rss(subreddit: str = "maliciouscompliance", time_filter: str = "month", limit: int = 15) -> List[Dict[str, Any]]:
     clean_sub = subreddit.replace("r/", "").strip()
-    url = f"https://old.reddit.com/r/{clean_sub}/top/.rss?t={time_filter}&limit={limit}"
+    url = f"https://www.reddit.com/r/{clean_sub}/top/.rss?t={time_filter}&limit={limit}"
     posts = []
     
     with LogSpan("scrape_subreddit_rss", extra={"subreddit": clean_sub, "url": url}):
@@ -71,8 +71,12 @@ def scrape_subreddit_rss(subreddit: str = "maliciouscompliance", time_filter: st
                     xml_text = resp.read().decode("utf-8", errors="ignore")
 
             if not xml_text or "<feed" not in xml_text:
-                app_logger.warning(f"[RedditScraper] Resposta RSS vazia ou inválida para r/{clean_sub}")
+                if "429 Too Many Requests" in xml_text or not xml_text:
+                    app_logger.warning(f"[RedditScraper] Reddit bloqueou temporariamente via Rate Limit (HTTP 429) para r/{clean_sub}")
+                else:
+                    app_logger.warning(f"[RedditScraper] Resposta RSS não contém feed XML válido para r/{clean_sub}")
                 return []
+
 
             root = ET.fromstring(xml_text)
             ns = {"atom": "http://www.w3.org/2005/Atom"}
