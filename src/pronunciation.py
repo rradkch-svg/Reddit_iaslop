@@ -566,6 +566,91 @@ REDDIT_ENGLISH_PHONETIC_LEXICON: Dict[str, str] = {
     "pr": "P-R",
 }
 
+# =============================================================================
+# Dicionário e Sanitizador de Termos Sensíveis para Diretrizes do YouTube
+# =============================================================================
+YOUTUBE_SAFE_WORD_MAP: Dict[str, str] = {
+    "cornography": "cornography",
+    "pornography": "cornography",
+    "pornographic": "cornographic",
+    "porno": "corno",
+    "porn": "corn",
+    "sexually": "intimately",
+    "sexual": "intimate",
+    "sexy": "attractive",
+    "having sex": "hooking up",
+    "had sex": "hooked up",
+    "sex": "vex",
+    "intercourse": "intimacy",
+    "nsfw": "spicy",
+    "nudes": "noods",
+    "nude": "nood",
+    "naked": "unclothed",
+    "suicidal": "self-harming",
+    "suicide": "self-harm",
+    "murdered": "eliminated",
+    "murderer": "attacker",
+    "murdering": "attacking",
+    "murder": "foul play",
+    "killing": "unaliving",
+    "killed": "unalived",
+    "killer": "attacker",
+    "kill": "unalive",
+    "rapist": "assailant",
+    "raped": "assaulted",
+    "rape": "assault",
+    "cocaine": "white powder",
+    "heroin": "substance",
+    "methamphetamine": "illicit substance",
+    "meth": "substance",
+    "drugs": "substances",
+    "drug": "substance",
+    "overdose": "medical emergency",
+    "fucking": "freaking",
+    "fucked": "messed",
+    "fucker": "jerk",
+    "fuck": "freak",
+    "bitches": "jerks",
+    "bitch": "jerk",
+    "bastard": "rascal",
+    "asshole": "jerk",
+    "dick": "jerk",
+    "pussy": "coward",
+    "cock": "idiot",
+    "bullshit": "nonsense",
+    "shit": "crap",
+    "shitty": "terrible",
+    "whore": "tramp",
+    "slut": "tramp",
+}
+
+def _match_case(word: str, replacement: str) -> str:
+    """Preserva a capitalização original (UPPERCASE, Titlecase ou lowercase)."""
+    if word.isupper():
+        return replacement.upper()
+    if word.istitle():
+        return replacement.capitalize()
+    return replacement.lower()
+
+def sanitize_youtube_compliance(text: str) -> str:
+    """
+    Substitui termos sensíveis/NSFW por alternativas seguras e monetizáveis no YouTube,
+    preservando maiúsculas/minúsculas e pontuação.
+    """
+    if not text:
+        return ""
+
+    result = text
+    # Ordena chaves por comprimento decrescente para substituir frases compostas primeiro
+    for term in sorted(YOUTUBE_SAFE_WORD_MAP.keys(), key=len, reverse=True):
+        replacement = YOUTUBE_SAFE_WORD_MAP[term]
+        pattern = r'\b' + re.escape(term) + r'\b'
+        def repl(m, target=replacement):
+            return _match_case(m.group(0), target)
+        result = re.sub(pattern, repl, result, flags=re.IGNORECASE)
+
+    return result
+
 class RedditPhoneticEngine:
     """
     Motor fonético para narrativas do Reddit em inglês.
@@ -579,19 +664,20 @@ class RedditPhoneticEngine:
         if not text:
             return ""
 
-        result = text
+        # 1. Aplica sanitização de palavras contra diretrizes do YouTube
+        result = sanitize_youtube_compliance(text)
 
-        # 1. Converte valores monetários abreviados ($45k -> 45 thousand dollars, $1.5M -> 1.5 million dollars)
+        # 2. Converte valores monetários abreviados ($45k -> 45 thousand dollars, $1.5M -> 1.5 million dollars)
         result = re.sub(r'\$(\d+(?:\.\d+)?)\s*[kK]\b', r'\1 thousand dollars', result)
         result = re.sub(r'\$(\d+(?:\.\d+)?)\s*[mM]\b', r'\1 million dollars', result)
         result = re.sub(r'\$(\d+(?:,\d{3})+|\d+)\b', r'\1 dollars', result)
 
-        # 2. Converte termos do fórum preservando pontuação
+        # 3. Converte termos do fórum preservando pontuação
         for term, replacement in self.lexicon.items():
             pattern = r'\b' + re.escape(term) + r'\b'
             result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
 
-        # 3. Limpa espaços duplos
+        # 4. Limpa espaços duplos
         result = re.sub(r'\s+', ' ', result).strip()
         return result
 

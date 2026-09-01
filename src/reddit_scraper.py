@@ -11,9 +11,11 @@ from typing import List, Dict, Any, Optional
 try:
     from .logger import app_logger, LogSpan
     from .reddit_agents import RedditStoryDirectorAgent
+    from .pronunciation import sanitize_youtube_compliance
 except ImportError:
     from logger import app_logger, LogSpan
     from reddit_agents import RedditStoryDirectorAgent
+    from pronunciation import sanitize_youtube_compliance
 
 HIGH_CPM_SUBREDDITS = [
     "maliciouscompliance",
@@ -38,16 +40,31 @@ DEFAULT_HEADERS = {
 }
 
 def clean_reddit_text(raw_text: str) -> str:
-
+    """Limpa formatação, metadados do Reddit RSS, tags HTML e aplica filtro de monetização do YouTube."""
+    if not raw_text:
+        return ""
 
     text = html.unescape(raw_text)
+    # 1. Remove tags HTML
     text = re.sub(r"<[^>]+>", " ", text)
+    # 2. Converte links markdown [texto](url) -> texto e remove URLs brutas
     text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
     text = re.sub(r"https?://\S+", "", text)
+    # 3. Remove metadados de submissão do RSS do Reddit: "submitted by ... [link] [comments]"
+    text = re.sub(r"(?i)\(?(?:submitted\s+by|posted\s+by)\s+.*?(?:\[link\]|\[comments\]|\(link\s+comments\)|link\s+comments|\Z)\)?", "", text)
+    text = re.sub(r"(?i)\[\s*(?:link|comments?)\s*\]|\(\s*(?:link|comments?)\s*\)", "", text)
+    text = re.sub(r"(?i)\(?\s*submitted\s+by\s+[^)\n]*\)?", "", text)
+    # 4. Remove TL;DR e tags de encerramento de fórum
     text = re.sub(r"(?i)\b(tl;?dr|tldr)\b.*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"(?i)\b(?:the\s+end|o\s+fim)\s*[.!]?\s*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"(?i)\b(?:thanks\s+for\s+reading|thank\s+you\s+for\s+reading)\b.*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"(?i)\b(?:edit\s*:?\s*thanks\s+for\s+the\s+(?:gold|upvotes|awards?))\b.*$", "", text, flags=re.MULTILINE)
+    # 5. Normaliza quebras de linha e espaços
     text = re.sub(r"\r\n|\r", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]+", " ", text)
+    # 6. Aplica filtro de monetização do YouTube
+    text = sanitize_youtube_compliance(text)
     return text.strip()
 
 def scrape_subreddit_rss(subreddit: str = "maliciouscompliance", time_filter: str = "month", limit: int = 15) -> List[Dict[str, Any]]:

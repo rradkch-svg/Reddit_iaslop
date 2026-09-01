@@ -8,11 +8,11 @@ from typing import Dict, Any, List, Optional, Tuple
 try:
     from .logger import app_logger, LogSpan
     from .gemini_client import generate_with_resilience, resolve_gemini_api_keys, DEFAULT_FALLBACK_MODELS
-    from .pronunciation import phoneticize_reddit_text
+    from .pronunciation import phoneticize_reddit_text, sanitize_youtube_compliance
 except ImportError:
     from logger import app_logger, LogSpan
     from gemini_client import generate_with_resilience, resolve_gemini_api_keys, DEFAULT_FALLBACK_MODELS
-    from pronunciation import phoneticize_reddit_text
+    from pronunciation import phoneticize_reddit_text, sanitize_youtube_compliance
 
 PERSONA_VOICE_MAP = {
     "male_dramatic": "en-US-ChristopherNeural",
@@ -56,7 +56,8 @@ class RedditStoryDirectorAgent:
             "3. PERSONA IDENTIFICATION: Detect whether the original narrator is male, female, or neutral, and pick the best persona ('male_dramatic', 'female_expressive', 'male_casual', 'young_fast').\n"
             "4. SHORTS DURATION (UP TO 2.5 MINUTES): 'shorts_script' must be between 300 to 450 words (approx. 2.0 to 2.5 minutes spoken at 1.20x speed). It must tell the complete arc and conclude with a punchline.\n"
             "5. SEAMLESS OUTRO & ENGAGEMENT CTA (MANDATORY): Conclude the story resolution cleanly, then smoothly bridge into the audience question using a natural conversational segue (e.g., 'Now looking back at how this all played out, I have to ask: what would you have done in my situation? Drop your thoughts in the comments below.'). Never make the final CTA feel like an abrupt cut or disjointed break.\n"
-            "6. LONG-FORM SCRIPT: 'longform_script' must be an extended, rich narrative (600 to 1000 words).\n\n"
+            "6. LONG-FORM SCRIPT: 'longform_script' must be an extended, rich narrative (600 to 1000 words).\n"
+            "7. YOUTUBE ADVERTISER-FRIENDLY & MONETIZATION POLICY (STRICT): Never write explicit, restricted, or demonetized words. ALWAYS use safe terms naturally (e.g. 'corn' instead of 'porn', 'vex' or 'hooking up' instead of 'sex', 'unalive' or 'ended' instead of 'kill/suicide/murder', 'substances' instead of 'drugs'). Never include Reddit metadata like 'submitted by', 'link comments', or outro phrases like 'the end'.\n\n"
             "OUTPUT JSON SCHEMA:\n"
             "{\n"
             "  \"title\": \"Catchy High-CTR YouTube Title (under 80 chars)\",\n"
@@ -123,16 +124,27 @@ class RedditStoryDirectorAgent:
             cleaned
         )
 
-        # 5. Limpa caracteres residuais de markdown/símbolos no início
+        # 5. Remove metadados de submissão do Reddit e notas de rodapé de fórum
+        cleaned = re.sub(r'(?i)\(?(?:submitted\s+by|posted\s+by)\s+.*?(?:\[link\]|\[comments\]|\(link\s+comments\)|link\s+comments|\Z)\)?', ' ', cleaned)
+        cleaned = re.sub(r'(?i)\[\s*(?:link|comments?)\s*\]|\(\s*(?:link|comments?)\s*\)', ' ', cleaned)
+        cleaned = re.sub(r'(?i)\(?\s*submitted\s+by\s+[^)\n]*\)?', ' ', cleaned)
+        cleaned = re.sub(r'(?i)\b(?:the\s+end|o\s+fim)\s*[.!]?\s*$', ' ', cleaned)
+        cleaned = re.sub(r'(?i)\b(?:thanks\s+for\s+reading|thank\s+you\s+for\s+reading)\b.*$', ' ', cleaned)
+        cleaned = re.sub(r'(?i)\b(?:edit\s*:?\s*thanks\s+for\s+the\s+(?:gold|upvotes|awards?))\b.*$', ' ', cleaned)
+
+        # 6. Limpa caracteres residuais de markdown/símbolos no início
         cleaned = re.sub(r'^[#*_\-\s>]+', '', cleaned)
-        # 6. Limpa asteriscos/underscores/backticks avulsos de markdown ao redor de palavras
+        # 7. Limpa asteriscos/underscores/backticks avulsos de markdown ao redor de palavras
         cleaned = re.sub(r'(?<!\w)[*_~`]+|[ *_~`]+(?!\w)', ' ', cleaned)
-        # 7. Limpa pontuações órfãs como '. :' ou '. -' após pontuação de frase
+        # 8. Limpa pontuações órfãs como '. :' ou '. -' após pontuação de frase
         cleaned = re.sub(r'(?<=[.!?])\s*[:\-]+\s*', ' ', cleaned)
-        # 8. Remove múltiplos espaços
+        # 9. Remove múltiplos espaços
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
 
-        # 9. Aplica expansão fonética de siglas do Reddit (AITA -> Am I the jerk, MIL -> mother-in-law, $45k -> 45 thousand dollars)
+        # 10. Aplica sanitização de palavras contra diretrizes do YouTube (porn -> corn, sex -> vex, etc.)
+        cleaned = sanitize_youtube_compliance(cleaned)
+
+        # 11. Aplica expansão fonética de siglas do Reddit (AITA -> Am I the jerk, MIL -> mother-in-law, $45k -> 45 thousand dollars)
         cleaned = phoneticize_reddit_text(cleaned)
 
         return cleaned
@@ -589,7 +601,8 @@ class RedditStoryDirectorAgent:
                 f"AUTHENTIC REDDIT RULES:\n"
                 f"1. RAW & BELIEVABLE: Write in natural first-person English ('I', 'my boss', 'my landlord', 'my team'). Include specific, believable details (exact dollar amounts like $42,000, realistic corporate policies, lease terms, HOA bylaws, or workplace dynamics).\n"
                 f"2. NO AI CLICHÉS OR MORALIZING: Do NOT say 'little did they know' or 'justice was served'. Write like a real person recounting an infuriating conflict, their calculated compliance/revenge, and the satisfying, realistic fallout.\n"
-                f"3. STRUCTURE:\n"
+                f"3. YOUTUBE ADVERTISER-FRIENDLY (STRICT): Never write explicit or demonetized words (e.g., 'porn', 'sex', 'kill', 'suicide', 'murder', 'drugs', 'rape'). Use safe colloquialisms ('corn', 'vex', 'hooking up', 'unalived', 'substances'). Never include 'submitted by', '[link]', '[comments]', or 'the end'.\n"
+                f"4. STRUCTURE:\n"
                 f"   - Title: Punchy high-impact Reddit post title with numbers or stark conflict (under 95 chars).\n"
                 f"   - Author: Realistic Reddit username (e.g. 'u/Throwaway_SysAdmin99', 'u/LeaseFighter_24').\n"
                 f"   - Upvotes / Score: Realistic score (e.g. '34.2k').\n"
