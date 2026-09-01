@@ -522,3 +522,81 @@ DEFAULT_PRONUNCIATION_ENGINE = AutomotivePronunciationEngine()
 def phoneticize_automotive_text(text: str) -> str:
     """Função utilitária rápida para converter texto em fonética automotiva."""
     return DEFAULT_PRONUNCIATION_ENGINE.phoneticize(text)
+
+
+# =============================================================================
+# Léxico Fonético e Expansor de Abreviações do Reddit em Inglês
+# =============================================================================
+REDDIT_ENGLISH_PHONETIC_LEXICON: Dict[str, str] = {
+    "aita": "Am I the jerk",
+    "aitah": "Am I the jerk",
+    "wibta": "Would I be the jerk",
+    "wibtah": "Would I be the jerk",
+    "nta": "Not the jerk",
+    "yta": "You're the jerk",
+    "esh": "Everyone is wrong",
+    "nah": "No one is wrong",
+    "mil": "mother-in-law",
+    "m.i.l.": "mother-in-law",
+    "fil": "father-in-law",
+    "f.i.l.": "father-in-law",
+    "sil": "sister-in-law",
+    "s.i.l.": "sister-in-law",
+    "bil": "brother-in-law",
+    "b.i.l.": "brother-in-law",
+    "dh": "husband",
+    "dw": "wife",
+    "ds": "son",
+    "dd": "daughter",
+    "stbx": "soon-to-be ex",
+    "stbxw": "soon-to-be ex-wife",
+    "stbxh": "soon-to-be ex-husband",
+    "op": "the original poster",
+    "tifu": "Today I messed up",
+    "tldr": "",
+    "tl;dr": "",
+    "hoa": "Homeowners Association",
+    "hr": "Human Resources",
+    "ceo": "C-E-O",
+    "cfo": "C-F-O",
+    "coo": "C-O-O",
+    "cto": "C-T-O",
+    "vp": "vice president",
+    "it": "I-T",
+    "pr": "P-R",
+}
+
+class RedditPhoneticEngine:
+    """
+    Motor fonético para narrativas do Reddit em inglês.
+    Converte abreviações de fórum, siglas familiares e notações monetárias
+    em texto falado natural e fluido.
+    """
+    def __init__(self, lexicon: Optional[Dict[str, str]] = None):
+        self.lexicon = lexicon or REDDIT_ENGLISH_PHONETIC_LEXICON
+
+    def phoneticize(self, text: str) -> str:
+        if not text:
+            return ""
+
+        result = text
+
+        # 1. Converte valores monetários abreviados ($45k -> 45 thousand dollars, $1.5M -> 1.5 million dollars)
+        result = re.sub(r'\$(\d+(?:\.\d+)?)\s*[kK]\b', r'\1 thousand dollars', result)
+        result = re.sub(r'\$(\d+(?:\.\d+)?)\s*[mM]\b', r'\1 million dollars', result)
+        result = re.sub(r'\$(\d+(?:,\d{3})+|\d+)\b', r'\1 dollars', result)
+
+        # 2. Converte termos do fórum preservando pontuação
+        for term, replacement in self.lexicon.items():
+            pattern = r'\b' + re.escape(term) + r'\b'
+            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+
+        # 3. Limpa espaços duplos
+        result = re.sub(r'\s+', ' ', result).strip()
+        return result
+
+DEFAULT_REDDIT_PHONETIC_ENGINE = RedditPhoneticEngine()
+
+def phoneticize_reddit_text(text: str) -> str:
+    """Função utilitária rápida para converter texto do Reddit para fonética em inglês."""
+    return DEFAULT_REDDIT_PHONETIC_ENGINE.phoneticize(text)

@@ -8,9 +8,11 @@ from typing import Dict, Any, List, Optional, Tuple
 try:
     from .logger import app_logger, LogSpan
     from .gemini_client import generate_with_resilience, resolve_gemini_api_keys, DEFAULT_FALLBACK_MODELS
+    from .pronunciation import phoneticize_reddit_text
 except ImportError:
     from logger import app_logger, LogSpan
     from gemini_client import generate_with_resilience, resolve_gemini_api_keys, DEFAULT_FALLBACK_MODELS
+    from pronunciation import phoneticize_reddit_text
 
 PERSONA_VOICE_MAP = {
     "male_dramatic": "en-US-ChristopherNeural",
@@ -127,6 +129,10 @@ class RedditStoryDirectorAgent:
         cleaned = re.sub(r'(?<=[.!?])\s*[:\-]+\s*', ' ', cleaned)
         # 8. Remove múltiplos espaços
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+        # 9. Aplica expansão fonética de siglas do Reddit (AITA -> Am I the jerk, MIL -> mother-in-law, $45k -> 45 thousand dollars)
+        cleaned = phoneticize_reddit_text(cleaned)
+
         return cleaned
 
     def _generate_algorithmic_fallback_script(self, raw_post: Dict[str, Any]) -> Dict[str, Any]:
@@ -135,7 +141,7 @@ class RedditStoryDirectorAgent:
         raw_body = raw_post.get("body", "").strip()
         body = self.clean_spoken_story_text(raw_body)
         subreddit = raw_post.get("subreddit", "r/maliciouscompliance").strip()
-        author = raw_post.get("author", "u/RedditUser").strip()
+        author = raw_post.get("author", "u/RedditMinute").strip()
         score = raw_post.get("score", "24.5k")
 
         clean_title = self.clean_spoken_story_text(title).rstrip(".")
@@ -199,8 +205,9 @@ class RedditStoryDirectorAgent:
             "tags": tags,
             "ui_card": {
                 "channel_name": "Reddit Minute",
+                "subreddit": subreddit,
                 "score": score,
-                "display_title": title
+                "display_title": clean_title
             }
         }
 

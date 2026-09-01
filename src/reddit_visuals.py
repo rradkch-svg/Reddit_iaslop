@@ -155,12 +155,23 @@ class RedditVisualEngine:
             draw.ellipse([icon_x, icon_y, icon_x + icon_size, icon_y + icon_size], fill=(255, 69, 0, 255))
             draw.text((icon_x + 10, icon_y + 12), "RM", font=get_font(28, bold=True), fill=(255, 255, 255, 255))
 
-        # 4. Header: Nome do Canal "Reddit Minute" + Timestamp
+        # 4. Header: Subreddit + Autor Anônimo do Canal + Timestamp (Preservando Anonimato)
+        subreddit = card_data.get("subreddit", "r/RedditStories")
+        if not subreddit.startswith("r/"):
+            subreddit = f"r/{subreddit}"
+        
+        channel_name = card_data.get("channel_name", "Reddit Minute")
+        if not channel_name.startswith("u/"):
+            author_tag = f"u/{channel_name.replace(' ', '')}"
+        else:
+            author_tag = channel_name
+
         text_start_x = icon_x + icon_size + 18
-        draw.text((text_start_x, icon_y + 4), channel_name, font=font_sub, fill=(255, 255, 255, 255))
-        channel_len = draw.textlength(channel_name, font=font_sub)
-        meta_str = f" • {time_ago}"
-        draw.text((text_start_x + channel_len, icon_y + 8), meta_str, font=font_meta, fill=(145, 148, 150, 255))
+        draw.text((text_start_x, icon_y + 4), subreddit, font=font_sub, fill=(255, 255, 255, 255))
+        sub_len = draw.textlength(subreddit, font=font_sub)
+
+        meta_str = f" • Posted by {author_tag} • {time_ago}"
+        draw.text((text_start_x + sub_len, icon_y + 8), meta_str, font=font_meta, fill=(145, 148, 150, 255))
 
         # 5. Título em Negrito e Alta Nitidez
         curr_y = icon_y + icon_size + 26

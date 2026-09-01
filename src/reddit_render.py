@@ -147,10 +147,10 @@ def render_reddit_story_video(
             inputs.extend(["-stream_loop", "-1", "-i", bg_to_use])
             bg_filter = f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
         else:
-            src_w = 540 if is_vertical else 960
-            src_h = 960 if is_vertical else 540
+            src_w = 1080 if is_vertical else 1920
+            src_h = 1920 if is_vertical else 1080
             inputs.extend(["-f", "lavfi", "-i", f"testsrc2=size={src_w}x{src_h}:rate=60"])
-            bg_filter = f"[0:v]scale={target_w}:{target_h}:flags=bicubic,eq=brightness=-0.32:contrast=1.25:saturation=1.4[bg];"
+            bg_filter = f"[0:v]scale={target_w}:{target_h}:flags=bicubic,eq=brightness=-0.30:contrast=1.30:saturation=1.35[bg];"
 
         # Montagem dinâmica do filter complex conforme os overlays presentes
         filter_parts = [bg_filter]
