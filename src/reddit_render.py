@@ -1,5 +1,6 @@
 import os
 import glob
+import random
 import subprocess
 from typing import List, Tuple, Optional, Dict, Any
 
@@ -161,6 +162,11 @@ def render_reddit_story_video(
 
         inputs = []
         if bg_to_use and os.path.exists(bg_to_use):
+            bg_dur = get_media_duration(bg_to_use, ffmpeg_bin)
+            if bg_dur > 5.0:
+                max_seek = max(0.0, bg_dur - total_duration - 1.0)
+                random_ss = random.uniform(0.0, max_seek) if max_seek > 1.0 else random.uniform(0.0, bg_dur * 0.7)
+                inputs.extend(["-ss", f"{random_ss:.2f}"])
             inputs.extend(["-stream_loop", "-1", "-i", bg_to_use])
             bg_filter = f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
         else:
