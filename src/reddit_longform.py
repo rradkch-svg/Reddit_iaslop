@@ -28,28 +28,28 @@ except ImportError:
     from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
 
 
-def generate_25min_single_story_video(
+def generate_30min_single_story_video(
     target_subreddit: Optional[str] = None,
     custom_post: Optional[Dict[str, Any]] = None,
-    target_duration_minutes: float = 25.0,
+    target_duration_minutes: float = 30.0,
     output_base_dir: str = "checkpoint/auto_batches",
     custom_output_dir: Optional[str] = None,
     aspect_ratio: str = "16:9",
     status_callback = None
 ) -> Dict[str, Any]:
     """
-    Gera um vídeo longo de 25 MINUTOS (1500+ segundos) de UMA HISTÓRIA ÚNICA (não um compilado de histórias diferentes).
+    Gera um vídeo longo de 30+ MINUTOS (1800+ segundos) de UMA HISTÓRIA ÚNICA MONOLÍTICA (não um compilado de histórias diferentes).
     
     Estrutura:
-    1. Expande uma história real de alto impacto em uma narrativa profunda de 8 capítulos da MESMA história;
+    1. Expande uma história real de alto impacto em uma narrativa profunda de 10 capítulos da MESMA história;
     2. Locução neural consistente com a persona da história;
-    3. Cards Oficiais do Reddit com numeração de Partes/Capítulos no início de cada capítulo (4.8s);
-    4. Gameplay 1080p 60fps HD sem copyright do canal @OrbitalNCG;
+    3. Cards Oficiais do Reddit na abertura e transições sem repetições;
+    4. Gameplay 1080p 60fps HD sem copyright;
     5. Legendas dinâmicas estilo Hormozi palavra por palavra;
-    6. Concatenação perfeita dos capítulos em master 25min sem limite de memória;
+    6. Concatenação perfeita dos capítulos em master 30min sem limite de memória;
     7. Metadados e Timestamps oficiais salvos no padrão oficial batch_1/video_0...
     """
-    with LogSpan("generate_25min_single_story_video", extra={"target_min": target_duration_minutes}):
+    with LogSpan("generate_30min_single_story_video", extra={"target_min": target_duration_minutes}):
         ffmpeg_bin = find_ffmpeg_binary()
         
         # 1. Obter a história única a ser desenvolvida
@@ -80,13 +80,13 @@ def generate_25min_single_story_video(
         os.makedirs(cards_dir, exist_ok=True)
         os.makedirs(chunks_dir, exist_ok=True)
 
-        app_logger.info(f"[Longform25Min] Iniciando produção de história única de 25 min para: '{story_raw.get('title')}' em {longform_dir}")
+        app_logger.info(f"[Longform30Min] Iniciando produção de história única de 30+ min para: '{story_raw.get('title')}' em {longform_dir}")
         if status_callback:
-            status_callback(f"📖 Desenvolvendo narrativa profunda de 25 minutos: '{story_raw.get('title')[:40]}...'")
+            status_callback(f"📖 Desenvolvendo narrativa monolítica de 30+ minutos: '{story_raw.get('title')[:40]}...'")
 
-        # 2. Expansão da História Única em 8 Capítulos Épicos
+        # 2. Expansão da História Única em 10 Capítulos Monolíticos
         director = RedditStoryDirectorAgent()
-        longform_data = director.expand_25min_single_story(
+        longform_data = director.expand_30min_single_story(
             story_raw,
             target_minutes=target_duration_minutes,
             status_callback=status_callback
@@ -94,7 +94,7 @@ def generate_25min_single_story_video(
 
         chapters = longform_data.get("chapters", [])
         if not chapters:
-            raise ValueError("Nenhum capítulo retornado para a história de 25 minutos.")
+            raise ValueError("Nenhum capítulo retornado para a história de 30 minutos.")
 
         # Salva o roteiro completo estruturado
         script_file = os.path.join(longform_dir, "script_data.json")
@@ -184,9 +184,9 @@ def generate_25min_single_story_video(
             accumulated_time += seg_dur
 
         total_story_duration = accumulated_time
-        app_logger.info(f"[Longform25Min] Todas as {len(chapter_video_files)} partes renderizadas! Duração total: {total_story_duration/60:.2f} min")
+        app_logger.info(f"[Longform30Min] Todas as {len(chapter_video_files)} partes renderizadas! Duração total: {total_story_duration/60:.2f} min")
 
-        # 5. Concatenação ultrarrápida no Master 25 Minutos Final (FFmpeg Demuxer - Stream Copy)
+        # 5. Concatenação ultrarrápida no Master 30 Minutos Final (FFmpeg Demuxer - Stream Copy)
         if status_callback:
             status_callback(f"⚡ Consolidando Master Final de {total_story_duration/60:.1f} minutos...")
 
@@ -196,7 +196,7 @@ def generate_25min_single_story_video(
                 safe_cv = os.path.abspath(cv).replace("\\", "/")
                 f.write(f"file '{safe_cv}'\n")
 
-        output_master_mp4 = os.path.join(longform_dir, "longform_master_25min_16x9.mp4")
+        output_master_mp4 = os.path.join(longform_dir, "longform_master_30min_16x9.mp4")
         cmd_concat = [
             ffmpeg_bin, "-y",
             "-f", "concat",
@@ -206,7 +206,7 @@ def generate_25min_single_story_video(
             output_master_mp4
         ]
         subprocess.run(cmd_concat, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        app_logger.info(f"[Longform25Min] Master final gerado com sucesso: {output_master_mp4} ({os.path.getsize(output_master_mp4)} bytes)")
+        app_logger.info(f"[Longform30Min] Master final gerado com sucesso: {output_master_mp4} ({os.path.getsize(output_master_mp4)} bytes)")
 
         # 6. Concatena os áudios individuais no arquivo narration_longform.mp3
         master_audio_mp3 = os.path.join(longform_dir, "narration_longform.mp3")
@@ -249,13 +249,13 @@ DESCRIÇÃO COMPLETA:
 {timestamps_block}
 
 ---------------------------------------------------
-🎮 Background Gameplay: Minecraft Parkour 1080p 60fps by @OrbitalNCG (No Copyright Gameplay)
+🎮 Background Gameplay: Minecraft Parkour 1080p 60fps (No Copyright Gameplay)
 🎙️ Narração Neural: Persona {persona} ({voice_name}) via Reddit Story Studio
 Subreddit Original: {story_raw.get('subreddit')}
 Autor Original: {story_raw.get('author')}
 
 HASHTAGS:
-{" ".join(longform_data.get('tags', ['#RedditStories', '#MaliciousCompliance', '#25MinStory']))}
+{" ".join(longform_data.get('tags', ['#RedditStories', '#MaliciousCompliance', '#30MinStory', '#Longform']))}
 """
         with open(metadata_path, "w", encoding="utf-8") as f:
             f.write(meta_content)
@@ -278,7 +278,7 @@ HASHTAGS:
                 video_type="longform"
             )
         except Exception as e:
-            app_logger.warning(f"[Longform25Min] Erro ao registrar em blacklist_longform: {str(e)}")
+            app_logger.warning(f"[Longform30Min] Erro ao registrar em blacklist_longform: {str(e)}")
 
         return {
             "success": True,
@@ -292,7 +292,13 @@ HASHTAGS:
             "teaser_short_data": longform_data.get("teaser_short", {})
         }
 
+def generate_25min_single_story_video(*args, **kwargs) -> Dict[str, Any]:
+    """Alias retrocompatível para generate_30min_single_story_video."""
+    if "target_duration_minutes" not in kwargs:
+        kwargs["target_duration_minutes"] = 30.0
+    return generate_30min_single_story_video(*args, **kwargs)
+
 if __name__ == "__main__":
-    print("🚀 Starting 25-Minute Single Story Generator...")
-    res = generate_25min_single_story_video(target_duration_minutes=25.0)
-    print(f"✅ 25-Minute Single Story Video finished successfully in: {res.get('work_dir')}")
+    print("🚀 Starting 30-Minute Single Story Generator...")
+    res = generate_30min_single_story_video(target_duration_minutes=30.0)
+    print(f"✅ 30-Minute Single Story Video finished successfully in: {res.get('work_dir')}")

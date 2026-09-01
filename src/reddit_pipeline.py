@@ -265,9 +265,9 @@ def generate_teaser_short_video(
         }
         visual_engine.render_reddit_card(card_info, card_png, aspect_ratio="9:16")
 
-        # Banner visual de Gancho Final ("See More Here / Full 25-Min Saga")
+        # Banner visual de Gancho Final ("See More Here / Full 30-Min Saga")
         final_hook_png = os.path.join(teaser_dir, "final_hook_badge.png")
-        hook_banner_text = teaser_data.get("final_hook_text", "👉 FULL 25-MIN SAGA ON CHANNEL 🔗")
+        hook_banner_text = teaser_data.get("final_hook_text", "👉 FULL 30-MIN SAGA ON CHANNEL 🔗")
         visual_engine.render_final_hook_badge(
             badge_text=hook_banner_text,
             output_png=final_hook_png,
@@ -304,11 +304,11 @@ def generate_teaser_short_video(
 {teaser_data.get('title', story_raw.get('title', ''))}
 
 DESCRIÇÃO DO TEASER (CTA YOUTUBE):
-🔥 Assista à história completa de 25 minutos no canal Reddit Minute!
-🔗 Link completo na bio e nos comentários fixados.
+🔥 Watch the full 30-minute deep-dive saga on the Reddit Minute channel!
+🔗 Full video link in bio and pinned comments.
 
 HASHTAGS:
-{" ".join(teaser_data.get('tags', ['#RedditStories', '#Shorts', '#RedditMinute']))}
+{" ".join(teaser_data.get('tags', ['#RedditStories', '#Shorts', '#RedditMinute', '#30MinStory']))}
 """
         with open(metadata_file, "w", encoding="utf-8") as f:
             f.write(meta_content)

@@ -35,7 +35,7 @@ try:
     from .reddit_audio import RedditAudioEngine, REDDIT_PERSONA_VOICES
     from .reddit_visuals import RedditVisualEngine
     from .reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
-    from .reddit_longform import generate_25min_single_story_video
+    from .reddit_longform import generate_30min_single_story_video, generate_25min_single_story_video
     from .batch_manager import BatchManager
     from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
 except ImportError:
@@ -56,8 +56,7 @@ except ImportError:
     from reddit_subtitles import generate_reddit_ass_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
-
-    from reddit_longform import generate_25min_single_story_video
+    from reddit_longform import generate_30min_single_story_video, generate_25min_single_story_video
     from batch_manager import BatchManager
     from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
 
@@ -219,8 +218,8 @@ with tab_shorts:
 # TAB 2: HISTÓRIA ÚNICA DE 25 MINUTOS (16:9)
 # -------------------------------------------------------------
 with tab_longform:
-    st.markdown("### 🎬 Produção de Vídeo Longo (25 Minutos — História Única)")
-    st.caption("Desenvolve uma ÚNICA história real em uma saga cinematográfica de 25 minutos dividida em 8 capítulos cronológicos da mesma história com Cards de cada capítulo e timestamps para o YouTube.")
+    st.markdown("### 🎬 Produção de Vídeo Longo (30+ Minutos — História Única Monolítica)")
+    st.caption("Desenvolve uma ÚNICA história real em uma saga cinematográfica de 30+ minutos dividida em 10 capítulos cronológicos da mesma história com Cards de cada capítulo e timestamps para o YouTube.")
 
     col_lf1, col_lf2 = st.columns([1, 1])
     with col_lf1:
@@ -230,11 +229,11 @@ with tab_longform:
             index=0,
             key="lf_sub_select"
         )
-        target_mins = st.slider("Duração Alvo (Minutos):", min_value=20.0, max_value=30.0, value=25.0, step=1.0)
+        target_mins = st.slider("Duração Alvo (Minutos):", min_value=30.0, max_value=60.0, value=30.0, step=5.0)
         use_custom_lf = st.checkbox("✍️ Inserir História Customizada para Longform", key="use_custom_lf")
     with col_lf2:
         gen_teaser_check = st.checkbox("⚡ Gerar também o Teaser Short 9:16 (com Gancho Final)", value=True)
-        st.caption("Cria simultaneamente o clipe vertical promocional com badge '👉 FULL 25-MIN SAGA ON CHANNEL' e CTA de tela.")
+        st.caption("Cria simultaneamente o clipe vertical promocional com badge '👉 FULL 30-MIN SAGA ON CHANNEL' e CTA de tela.")
 
     custom_lf_obj = None
     if use_custom_lf:
@@ -256,7 +255,7 @@ with tab_longform:
             else:
                 st.success("✅ **Tema inédito para Long Videos!**")
 
-    if st.button("🚀 Produzir Vídeo Épico de 25 Minutos (História Única)", type="primary", use_container_width=True):
+    if st.button("🚀 Produzir Vídeo Épico de 30+ Minutos (História Única)", type="primary", use_container_width=True):
         status_lf = st.empty()
         prog_lf = st.progress(0)
 
@@ -266,7 +265,7 @@ with tab_longform:
         try:
             cb_lf(f"Iniciando produção de história única de {target_mins:.0f} minutos...")
             prog_lf.progress(15)
-            res_lf = generate_25min_single_story_video(
+            res_lf = generate_30min_single_story_video(
                 target_subreddit=lf_sub,
                 custom_post=custom_lf_obj,
                 target_duration_minutes=target_mins,
@@ -290,7 +289,7 @@ with tab_longform:
             if res_teaser and res_teaser.get("teaser_video") and os.path.exists(res_teaser["teaser_video"]):
                 v_col1, v_col2 = st.columns([1.6, 1])
                 with v_col1:
-                    st.markdown("#### 🎬 Master Longform 25 Minutos (16:9)")
+                    st.markdown("#### 🎬 Master Longform 30+ Minutos (16:9)")
                     st.video(res_lf["output_video"])
                     st.caption(f"Pasta: `{res_lf.get('longform_dir')}`")
                 with v_col2:

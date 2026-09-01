@@ -80,9 +80,9 @@ class TestSFXAndVisualRefactor(unittest.TestCase):
             "author": "u/TechHero",
             "score": "45.1k"
         }
-        res = agent._generate_algorithmic_25min_story(sample_post, 25.0)
+        res = agent._generate_algorithmic_30min_story(sample_post, 30.0)
         chapters = res.get("chapters", [])
-        self.assertEqual(len(chapters), 8)
+        self.assertEqual(len(chapters), 10)
 
         openers = []
         for ch in chapters:
@@ -98,7 +98,7 @@ class TestSFXAndVisualRefactor(unittest.TestCase):
             openers.append(narr[:35].strip())
 
         # Garante transicoes diversas (todos os inicios de capitulo distintos)
-        self.assertEqual(len(set(openers)), 8, f"Inicios de capitulo repetidos detectados: {openers}")
+        self.assertEqual(len(set(openers)), 10, f"Inicios de capitulo repetidos detectados: {openers}")
 
     def test_fallback_shorts_script_cleaning(self):
         """Verifica que o fallback de shorts limpa marcadores de capitulos do corpo do post."""

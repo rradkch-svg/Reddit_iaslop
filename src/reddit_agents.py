@@ -54,9 +54,9 @@ class RedditStoryDirectorAgent:
             "1. 3-SECOND HOOK (MANDATORY): The very first sentence MUST be an explosive paradox, financial consequence, or emotional confrontation that makes skipping impossible.\n"
             "2. PACING & WORD CHOICE: Write in active, punchy conversational English. Cut all useless fluff, throat-clearing, or Reddit acronym explanations. Focus on the conflict, the petty demands, the genius compliance, and the catastrophic fallout.\n"
             "3. PERSONA IDENTIFICATION: Detect whether the original narrator is male, female, or neutral, and pick the best persona ('male_dramatic', 'female_expressive', 'male_casual', 'young_fast').\n"
-            "4. SHORTS DURATION (UP TO 2.5 MINUTES): 'shorts_script' must be between 300 to 450 words (approx. 2.0 to 2.5 minutes spoken at 1.20x speed). It must tell the complete arc and conclude with a punchline.\n"
+            "4. SHORTS DURATION & COMPLETION (UP TO 3.0 MINUTES): If the story can fit within 3 minutes (up to 480 words spoken at 1.20x speed), you MUST tell the ENTIRE story completely without cutting off or omitting the middle or resolution. Never leave the story truncated or incomplete.\n"
             "5. SEAMLESS OUTRO & ENGAGEMENT CTA (MANDATORY): Conclude the story resolution cleanly, then smoothly bridge into the audience question using a natural conversational segue (e.g., 'Now looking back at how this all played out, I have to ask: what would you have done in my situation? Drop your thoughts in the comments below.'). Never make the final CTA feel like an abrupt cut or disjointed break.\n"
-            "6. LONG-FORM SCRIPT: 'longform_script' must be an extended, rich narrative (600 to 1000 words).\n"
+            "6. LONG-FORM SCRIPT (30+ MINUTES SAGA): 'longform_script' must be an extended, deeply detailed narrative suitable for deep-dive production.\n"
             "7. YOUTUBE ADVERTISER-FRIENDLY & MONETIZATION POLICY (STRICT): Never write explicit, restricted, or demonetized words. ALWAYS use safe terms naturally (e.g. 'corn' instead of 'porn', 'vex' or 'hooking up' instead of 'sex', 'unalive' or 'ended' instead of 'kill/suicide/murder', 'substances' instead of 'drugs'). Never include Reddit metadata like 'submitted by', 'link comments', or outro phrases like 'the end'.\n\n"
             "OUTPUT JSON SCHEMA:\n"
             "{\n"
@@ -64,8 +64,8 @@ class RedditStoryDirectorAgent:
             "  \"persona\": \"male_dramatic | female_expressive | male_casual | young_fast\",\n"
             "  \"recommended_voice\": \"en-US-ChristopherNeural | en-US-JennyNeural | en-US-GuyNeural | en-US-EricNeural\",\n"
             "  \"hook_text\": \"Explosive opening sentence\",\n"
-            "  \"shorts_script\": \"Full spoken narration for vertical Short (300-450 words, smoothly ending with engagement question)\",\n"
-            "  \"longform_script\": \"Extended full narration for long-form video (600-1000 words)\",\n"
+            "  \"shorts_script\": \"Full spoken narration for vertical Short (up to 480 words, complete unbroken story arc smoothly ending with engagement question)\",\n"
+            "  \"longform_script\": \"Extended full narration for long-form video\",\n"
             "  \"youtube_description\": \"Complete YouTube description with hook, summary, and subscribe CTA\",\n"
             "  \"tags\": [\"#RedditStories\", \"#MaliciousCompliance\", \"#Shorts\", ...],\n"
             "  \"ui_card\": {\n"
@@ -174,12 +174,14 @@ class RedditStoryDirectorAgent:
         collected_sentences = []
         word_count = 0
         
+        # Preserva a história INTEIRA se couber no limite de Shorts (até 480 palavras / ~2.8 minutos).
+        # Se ultrapassar 480 palavras, inclui todas as sentenças completas possíveis sem truncar no meio.
         for s in sentences:
             s_clean = s.strip()
             if not s_clean:
                 continue
             s_words = len(s_clean.split())
-            if (word_count + s_words > 360) and word_count >= 200:
+            if (word_count + s_words > 480) and word_count >= 320:
                 break
             collected_sentences.append(s_clean)
             word_count += s_words
@@ -279,70 +281,76 @@ class RedditStoryDirectorAgent:
                 app_logger.warning(f"[RedditAgents] Falha na chamada da API Gemini ({str(e)}). Usando fallback algorítmico...")
                 return self._generate_algorithmic_fallback_script(raw_post)
 
-    def expand_25min_single_story(
+    def expand_30min_single_story(
         self,
         raw_post: Dict[str, Any],
-        target_minutes: float = 25.0,
+        target_minutes: float = 30.0,
         status_callback = None
     ) -> Dict[str, Any]:
         """
-        Expande uma história ÚNICA do Reddit em uma narrativa completa e profunda de 25 minutos (~3.800 a 4.200 palavras).
-        A história é estruturada em 7 a 8 capítulos cronológicos da MESMA história (não um compilado),
+        Expande uma história ÚNICA do Reddit em uma narrativa monolítica, profunda e substancial de 30+ minutos (~4.800 a 5.500 palavras).
+        A história é estruturada em 10 capítulos cronológicos da MESMA história (não um compilado),
         incluindo contexto inicial, escalada de conflito, documentação secreta, dia do confronto, 
-        falha catastrófica, Updates 1 e 2 (investigações de RH, processos legais e acordos) e desfecho moral.
+        falha catastrófica, Updates 1 e 2 (investigações de RH, processos legais e acordos), auditoria forense e desfecho moral.
         """
-        with LogSpan("RedditStoryDirectorAgent.expand_25min_single_story", extra={"title": raw_post.get("title")}):
+        with LogSpan("RedditStoryDirectorAgent.expand_30min_single_story", extra={"title": raw_post.get("title")}):
             configured_keys = resolve_gemini_api_keys(self.api_keys)
             
             if configured_keys and any(len(k) >= 20 for k in configured_keys):
                 try:
                     if status_callback:
-                        status_callback("🧠 IA Gemini desenvolvendo narrativa épica de 25 minutos (História Única em 8 Capítulos)...")
-                    return self._generate_gemini_25min_story(raw_post, target_minutes, status_callback)
+                        status_callback("🧠 IA Gemini desenvolvendo narrativa monolítica de 30+ minutos (História Única em 10 Capítulos)...")
+                    return self._generate_gemini_30min_story(raw_post, target_minutes, status_callback)
                 except Exception as e:
-                    app_logger.warning(f"[RedditAgents] Falha na expansão de 25min via Gemini ({e}). Usando arquiteto algorítmico...")
+                    app_logger.warning(f"[RedditAgents] Falha na expansão de 30min via Gemini ({e}). Usando arquiteto algorítmico...")
 
-            return self._generate_algorithmic_25min_story(raw_post, target_minutes)
+            return self._generate_algorithmic_30min_story(raw_post, target_minutes)
 
-    def _generate_gemini_25min_story(
+    def expand_25min_single_story(self, raw_post: Dict[str, Any], target_minutes: float = 30.0, status_callback = None) -> Dict[str, Any]:
+        """Alias retrocompatível para expand_30min_single_story."""
+        return self.expand_30min_single_story(raw_post, target_minutes=target_minutes, status_callback=status_callback)
+
+    def _generate_gemini_30min_story(
         self,
         raw_post: Dict[str, Any],
         target_minutes: float,
         status_callback = None
     ) -> Dict[str, Any]:
-        """Expansão via Gemini AI de uma história única para 25 minutos."""
+        """Expansão via Gemini AI de uma história única para 30+ minutos."""
         prompt = (
-            f"You are a master long-form documentarian and storyteller. Expand this REAL single Reddit story into an epic, highly detailed 25-minute deep-dive narrative.\n"
-            f"IMPORTANT: This must be ONE SINGLE, CONTINUOUS, DEEP-DIVE STORY about this exact situation and characters. It is NOT a compilation of different stories.\n\n"
+            f"You are a master documentary director and high-retention long-form YouTube storyteller. Expand this REAL single Reddit story into an epic, highly substantive 30+ minute monolithic deep-dive narrative.\n"
+            f"IMPORTANT: This must be ONE SINGLE, CONTINUOUS, HIGH-SUBSTANCE MONOLITHIC SAGA about this exact situation and characters. It is NOT a compilation of different stories.\n\n"
             f"ORIGINAL STORY:\n"
             f"Subreddit: {raw_post.get('subreddit')}\n"
             f"Title: {raw_post.get('title')}\n"
             f"Author: {raw_post.get('author')}\n"
             f"Body: {raw_post.get('body')}\n\n"
             f"STRUCTURE REQUIREMENTS:\n"
-            f"Create exactly 8 rich chronological narrative chapters of this SAME ongoing saga (approx. 450-550 words per chapter, total ~3,800 to 4,200 words):\n"
-            f"1. Setting the Stage, Workplace Context & The Absurd Directive\n"
+            f"Create exactly 10 rich, substantive chronological narrative chapters of this SAME ongoing saga (approx. 500-550 words per chapter, total ~5,000 to 5,500 words for 30+ minutes of spoken runtime):\n"
+            f"1. The Setting, Workplace Culture & The Incompetent Directive\n"
             f"2. The Formal Warning, Ignored Consequences & Escalating Tensions\n"
-            f"3. Building the Paper Trail & Documenting the Order in Writing\n"
+            f"3. Building the Bulletproof Paper Trail & Archiving Evidence\n"
             f"4. The Friday Afternoon Trigger & Flawless Malicious Compliance\n"
             f"5. The Weekend Meltdown, Compounding Overtime & Emergency Billing\n"
             f"6. Monday Morning Confrontation & Executive Inquest\n"
-            f"7. The Forensic Audit, Printed Proof & Immediate Accountability\n"
-            f"8. Epilogue: The Aftermath, Final Resolution & Moral Lesson\n\n"
+            f"7. The Hostile Investigation, HR Interrogation & The Printed Proof\n"
+            f"8. Disciplinary Repercussions, Terminations & Management Fallout\n"
+            f"9. Financial Restitution, Bonuses & Structural Department Overhaul\n"
+            f"10. Epilogue: Long-Term Vindication, Moral Lessons & Closing Verdict\n\n"
             f"MANDATORY NARRATIVE RULE: Do NOT say 'Chapter 1', 'Part 1', 'Chapter X', or read chapter titles aloud. The narration MUST be a single unbroken, seamless, highly conversational story that connects deeply with the viewer. Never use repetitive transitional formulas.\n\n"
             f"OUTPUT JSON SCHEMA:\n"
             f"{{\n"
-            f"  \"main_title\": \"Catchy 25-Min YouTube Documentary Title\",\n"
+            f"  \"main_title\": \"Catchy 30-Min YouTube Documentary Title\",\n"
             f"  \"persona\": \"male_dramatic | female_expressive | male_casual\",\n"
             f"  \"recommended_voice\": \"en-US-ChristopherNeural | en-US-JennyNeural | en-US-GuyNeural\",\n"
-            f"  \"youtube_description\": \"Detailed 25-minute description with chapter breakdown\",\n"
-            f"  \"tags\": [\"#RedditStories\", \"#MaliciousCompliance\", \"#Documentary\", ...],\n"
+            f"  \"youtube_description\": \"Detailed 30-minute description with chapter breakdown\",\n"
+            f"  \"tags\": [\"#RedditStories\", \"#MaliciousCompliance\", \"#Documentary\", \"#Longform\", ...],\n"
             f"  \"chapters\": [\n"
             f"    {{\n"
             f"      \"chapter_num\": 1,\n"
             f"      \"chapter_title\": \"The Absurd Directive\",\n"
             f"      \"card_display_title\": \"Part 1: The Directive\",\n"
-            f"      \"narration_text\": \"Seamless, natural spoken story prose without any robotic chapter announcements (450-550 words)...\"\n"
+            f"      \"narration_text\": \"Seamless, natural spoken story prose without any robotic chapter announcements (500-550 words)...\"\n"
             f"    }},\n"
             f"    ...\n"
             f"  ]\n"
@@ -351,7 +359,7 @@ class RedditStoryDirectorAgent:
 
         raw_text = generate_with_resilience(
             prompt=prompt,
-            system_instruction="You write immersive 25-minute deep-dive YouTube narrations for single continuous stories. Never announce chapter numbers or titles aloud in the narration.",
+            system_instruction="You write immersive 30-minute deep-dive YouTube narrations for single continuous stories. Never announce chapter numbers or titles aloud in the narration.",
             model_name=self.model_name,
             fallback_models=self.fallback_models,
             auto_fallback=self.auto_fallback,
@@ -362,23 +370,24 @@ class RedditStoryDirectorAgent:
         )
         data = json.loads(raw_text)
         chapters = data.get("chapters", [])
-        if not isinstance(chapters, list) or len(chapters) < 8:
-            return self._generate_algorithmic_25min_story(raw_post, target_minutes)
+        if not isinstance(chapters, list) or len(chapters) < 10:
+            return self._generate_algorithmic_30min_story(raw_post, target_minutes)
 
-        # Limpa qualquer resquício de 'Chapter X' ou 'Part X' que a IA possa ter incluído
+        # Limpa qualquer resquício de 'Chapter X' ou 'Part X' e garante a densidade de palavras (500+ por capítulo)
         for i, ch in enumerate(chapters):
             ch_text = ch.get("narration_text", "").strip()
             ch_text = self.clean_spoken_story_text(ch_text)
             ch_words = ch_text.split()
-            if len(ch_words) < 450:
+            if len(ch_words) < 500:
                 pad_text = (
                     "Every single memo, timestamp, and communication was documented meticulously to ensure total accountability. "
                     "The operational implications escalated rapidly as each stage of the directive was executed to the letter. "
-                    "Leadership remained oblivious to the cascading consequences while the financial costs mounted continuously."
+                    "Leadership remained oblivious to the cascading consequences while the financial costs mounted continuously. "
+                    "The team operated with complete precision, adhering strictly to the written policy while observing the fallout."
                 )
-                while len(ch_words) < 460:
+                while len(ch_words) < 510:
                     ch_words.extend(pad_text.split())
-                ch_text = " ".join(ch_words[:480])
+                ch_text = " ".join(ch_words[:530])
             ch["narration_text"] = ch_text
 
         # Gera Teaser Short vinculado para divulgação viral
@@ -387,25 +396,29 @@ class RedditStoryDirectorAgent:
         teaser_hook = (
             f"{' '.join(teaser_words)} "
             f"Management thought they had won... until Monday morning cost the company tens of thousands in emergency overtime. "
-            f"Watch the full 25-minute deep-dive on our channel right now! See more in the description."
+            f"Watch the full 30-minute deep-dive saga on our channel right now! See more in the description."
         )
         data["teaser_short"] = {
             "title": f"{data.get('main_title', raw_post.get('title', ''))[:60]} #Shorts",
             "hook_text": "They demanded total obedience. It cost them everything.",
             "script": teaser_hook,
-            "final_hook_text": "👉 FULL 25-MIN SAGA ON CHANNEL 🔗",
-            "final_hook_spoken_cta": "Watch the full 25-minute story on our channel! Link in bio and description.",
-            "tags": ["#RedditStories", "#Shorts", "#RedditMinute", "#Viral"]
+            "final_hook_text": "👉 FULL 30-MIN SAGA ON CHANNEL 🔗",
+            "final_hook_spoken_cta": "Watch the full 30-minute story on our channel! Link in bio and description.",
+            "tags": ["#RedditStories", "#Shorts", "#RedditMinute", "#Viral", "#30MinStory"]
         }
 
         return data
 
-    def _generate_algorithmic_25min_story(
+    def _generate_gemini_25min_story(self, raw_post: Dict[str, Any], target_minutes: float, status_callback = None) -> Dict[str, Any]:
+        """Alias retrocompatível para _generate_gemini_30min_story."""
+        return self._generate_gemini_30min_story(raw_post, target_minutes, status_callback)
+
+    def _generate_algorithmic_30min_story(
         self,
         raw_post: Dict[str, Any],
         target_minutes: float
     ) -> Dict[str, Any]:
-        """Expansão algorítmica profunda, natural e fluida para garantir um vídeo de 25 minutos de uma história única."""
+        """Expansão algorítmica profunda, natural e fluida para garantir um vídeo de 30+ minutos (10 capítulos, 5.200+ palavras)."""
         title = raw_post.get("title", "Insane Reddit Story").strip()
         raw_body = raw_post.get("body", "").strip()
         body = self.clean_spoken_story_text(raw_body)
@@ -424,7 +437,7 @@ class RedditStoryDirectorAgent:
         body_paras = [p.strip() for p in body.split("\n\n") if p.strip()]
         base_body_text = " ".join(body_paras)
 
-        # 8 Narrativas ricas, contínuas e sem repetições para cada fase da história
+        # 10 Narrativas ricas, contínuas e sem repetições para cada fase da história
         chapter_blueprints = [
             {
                 "num": 1,
@@ -490,7 +503,7 @@ class RedditStoryDirectorAgent:
             },
             {
                 "num": 6,
-                "title": "Update 1: Monday Morning Inquest",
+                "title": "Monday Morning Reckoning & Executive Inquest",
                 "card_title": f"Part 6: Monday Morning Inquest",
                 "opener": (
                     f"When Monday morning arrived, the atmosphere across the facility was electric. "
@@ -502,7 +515,7 @@ class RedditStoryDirectorAgent:
             },
             {
                 "num": 7,
-                "title": "Update 2: The Audit, Financials & The Escort",
+                "title": "The Hostile Investigation & The Printed Proof",
                 "card_title": f"Part 7: The Audit & Proof",
                 "opener": (
                     f"My manager immediately attempted to deflect blame, claiming that the floor staff had neglected standard operating procedures. "
@@ -514,14 +527,37 @@ class RedditStoryDirectorAgent:
             },
             {
                 "num": 8,
-                "title": "Epilogue: Moral Victory & Final Lessons",
-                "card_title": f"Part 8: The Aftermath",
+                "title": "Disciplinary Repercussions & Management Fallout",
+                "card_title": f"Part 8: Disciplinary Fallout",
                 "opener": (
-                    f"The aftermath was swift and decisive. "
-                    f"Standard operating protocols were immediately reinstated, our team received formal commendations and retention bonuses for our professionalism, and workplace morale soared to an all-time high. "
-                    f"Looking back at the entire saga, it stands as the ultimate testament to the power of malicious compliance: never interrupt someone while they are busy destroying their own career."
+                    f"The executive response was immediate and merciless. "
+                    f"An emergency review of all recent managerial decisions was launched by corporate compliance. "
+                    f"The manager was placed on indefinite suspension pending the formal audit, and their access badges were revoked before lunch. "
+                    f"It became glaringly obvious to everyone in upper management that the frontline team had acted with total professionalism under impossible constraints."
                 ),
-                "filler": "When working in high-stakes environments, always document everything in writing and let reality deliver the consequences."
+                "filler": "Internal investigations revealed a broader pattern of negligence, ensuring that the disciplinary actions were permanent and irreversible across the organization."
+            },
+            {
+                "num": 9,
+                "title": "Restitution, Bonuses & Structural Department Overhaul",
+                "card_title": f"Part 9: Department Overhaul",
+                "opener": (
+                    f"Within forty-eight hours of the audit completion, senior leadership held an all-hands meeting with our team. "
+                    f"Not only were all previous punitive directives permanently rescinded, but executive management also issued formal apologies. "
+                    f"To compensate for the stress and to acknowledge our unwavering adherence to protocol, substantial retention bonuses and overtime reimbursements were approved on the spot."
+                ),
+                "filler": "The department was restructured under competent technical leadership, ensuring that operational decisions were guided by subject matter expertise rather than corporate ego."
+            },
+            {
+                "num": 10,
+                "title": "Epilogue: Long-Term Vindication & Final Lessons",
+                "card_title": f"Part 10: The Aftermath",
+                "opener": (
+                    f"Looking back on this entire saga years later, the lessons remain clearer than ever. "
+                    f"When corporate leadership attempts to impose arbitrary and destructive mandates, resistance often achieves far less than rigorous, disciplined compliance with the written word. "
+                    f"By documenting every single interaction and letting their own policy run its natural course, we achieved complete vindication without violating a single regulation."
+                ),
+                "filler": "Always protect yourself with a clear paper trail, never take unreasonable blame, and remember that malicious compliance is the most effective mirror you can hold up to bad management."
             }
         ]
 
@@ -534,11 +570,11 @@ class RedditStoryDirectorAgent:
             filler_text = bp["filler"]
 
             words = opener_text.split()
-            while len(words) < 480:
+            while len(words) < 510:
                 words.extend(f" {filler_text}".split())
 
-            final_text = " ".join(words[:500]).rstrip(".!? ")
-            if num == 8:
+            final_text = " ".join(words[:530]).rstrip(".!? ")
+            if num == 10:
                 cta = random.choice(ENGAGEMENT_QUESTIONS)
                 final_text += f". {cta}"
 
@@ -554,31 +590,35 @@ class RedditStoryDirectorAgent:
             f"When management demanded strict handbook adherence with zero exceptions, I documented the warning and stepped aside. "
             f"The system collapsed right on schedule, triggering triple overtime and emergency contractors. "
             f"The boss thought he had won... until Monday morning when executive leadership demanded answers. "
-            f"Watch the full 25-minute deep-dive saga and the legal fallout on our channel right now! See more in the description."
+            f"Watch the full 30-minute deep-dive saga and the legal fallout on our channel right now! See more in the description."
         )
 
         return {
-            "main_title": f"{title} [25 MIN FULL STORY]",
+            "main_title": f"{title} [30 MIN FULL STORY]",
             "persona": persona,
             "recommended_voice": voice,
             "youtube_description": (
                 f"🔥 {title}\n\n"
-                f"A complete 25-minute deep dive into one of the most insane Reddit stories.\n\n"
+                f"A complete 30-minute deep dive into one of the most insane Reddit stories.\n\n"
                 f"⏱️ Chapters:\n"
                 + "\n".join([f"- Part {c['chapter_num']}: {c['chapter_title']}" for c in chapters])
                 + f"\n\n💬 What would you have done? Leave a comment below!\n🔔 Subscribe to Reddit Minute for daily full-length Reddit stories!"
             ),
-            "tags": ["#RedditStories", "#MaliciousCompliance", "#WorkplaceDrama", "#25MinStory", "#Documentary", "#Longform", "#RedditMinute"],
+            "tags": ["#RedditStories", "#MaliciousCompliance", "#WorkplaceDrama", "#30MinStory", "#Documentary", "#Longform", "#RedditMinute"],
             "chapters": chapters,
             "teaser_short": {
                 "title": f"{title[:55]} #Shorts",
                 "hook_text": "Following orders cost them $42,000.",
                 "script": teaser_script,
-                "final_hook_text": "👉 FULL 25-MIN SAGA ON CHANNEL 🔗",
-                "final_hook_spoken_cta": "Watch the full 25-minute saga on our channel right now! See more in description.",
-                "tags": ["#RedditStories", "#MaliciousCompliance", "#Shorts", "#RedditMinute"]
+                "final_hook_text": "👉 FULL 30-MIN SAGA ON CHANNEL 🔗",
+                "final_hook_spoken_cta": "Watch the full 30-minute saga on our channel right now! See more in description.",
+                "tags": ["#RedditStories", "#MaliciousCompliance", "#Shorts", "#RedditMinute", "#30MinStory"]
             }
         }
+
+    def _generate_algorithmic_25min_story(self, raw_post: Dict[str, Any], target_minutes: float) -> Dict[str, Any]:
+        """Alias retrocompatível para _generate_algorithmic_30min_story."""
+        return self._generate_algorithmic_30min_story(raw_post, target_minutes)
 
     def synthesize_authentic_reddit_post(
         self,

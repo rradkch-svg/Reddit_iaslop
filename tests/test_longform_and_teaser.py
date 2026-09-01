@@ -1,4 +1,4 @@
-﻿import os
+import os
 import tempfile
 import unittest
 import json
@@ -23,24 +23,24 @@ class TestLongformAndTeaser(unittest.TestCase):
         import shutil
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    def test_25min_story_expansion_and_teaser_structure(self):
-        """Verifica a expansao da historia unica em 8 capitulos e a geracao do teaser short com gancho final."""
-        director = RedditStoryDirectorAgent()
-        data = director._generate_algorithmic_25min_story(self.sample_story, target_minutes=25.0)
+    def test_30min_story_expansion_and_teaser_structure(self):
+        """Verifica a expansao da historia unica em 10 capitulos e a geracao do teaser short com gancho final."""
+        director = RedditStoryDirectorAgent(api_keys=[])
+        data = director._generate_algorithmic_30min_story(self.sample_story, target_minutes=30.0)
 
-        # 1. Verifica 8 capitulos
+        # 1. Verifica 10 capitulos
         chapters = data.get("chapters", [])
-        self.assertEqual(len(chapters), 8)
+        self.assertEqual(len(chapters), 10)
         
         total_words = sum(len(ch["narration_text"].split()) for ch in chapters)
-        self.assertGreaterEqual(total_words, 3500)
+        self.assertGreaterEqual(total_words, 5000)
 
         # 2. Verifica estrutura do Teaser Short
         teaser = data.get("teaser_short", {})
         self.assertTrue(isinstance(teaser, dict))
         self.assertIn("script", teaser)
         self.assertIn("final_hook_text", teaser)
-        self.assertIn("👉 FULL 25-MIN SAGA", teaser["final_hook_text"])
+        self.assertIn("👉 FULL 30-MIN SAGA", teaser["final_hook_text"])
         self.assertIn("final_hook_spoken_cta", teaser)
 
     def test_final_hook_badge_rendering(self):

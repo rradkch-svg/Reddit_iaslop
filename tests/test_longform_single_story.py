@@ -14,27 +14,27 @@ class TestLongformSingleStory(unittest.TestCase):
 
 
 
-        longform_data = director._generate_algorithmic_25min_story(story, target_minutes=25.0)
+        longform_data = director._generate_algorithmic_30min_story(story, target_minutes=30.0)
         
         self.assertIn("chapters", longform_data)
         chapters = longform_data["chapters"]
-        self.assertEqual(len(chapters), 8, f"Esperado 8 capítulos para 25min, obtido: {len(chapters)}")
+        self.assertEqual(len(chapters), 10, f"Esperado 10 capítulos para 30min, obtido: {len(chapters)}")
 
         total_words = sum(len(c.get("narration_text", "").split()) for c in chapters)
-        self.assertGreaterEqual(total_words, 3500, f"Total de palavras ({total_words}) insuficiente para 25 minutos.")
+        self.assertGreaterEqual(total_words, 5000, f"Total de palavras ({total_words}) insuficiente para 30 minutos.")
 
         openers = []
         for ch in chapters:
             self.assertIsNotNone(ch.get("chapter_num"))
             self.assertTrue(ch.get("chapter_title"))
             narr = ch.get("narration_text", "")
-            self.assertGreaterEqual(len(narr.split()), 350)
+            self.assertGreaterEqual(len(narr.split()), 480)
             # Sem anuncios roboticos falados
             self.assertFalse(narr.lower().startswith(("chapter", "part")), f"Capitulo inicia com prefixo robotico: {narr[:30]}")
             openers.append(narr[:30].strip())
 
         # Transicoes diversas
-        self.assertEqual(len(set(openers)), 8, f"Inicios de capitulos repetidos: {openers}")
+        self.assertEqual(len(set(openers)), 10, f"Inicios de capitulos repetidos: {openers}")
 
         # Teaser short sem marcadores roboticos falados
         teaser = longform_data.get("teaser_short", {})

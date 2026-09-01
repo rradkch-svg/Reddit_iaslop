@@ -106,7 +106,7 @@ try:
     from .reddit_scraper import HIGH_CPM_SUBREDDITS, fetch_top_high_cpm_stories
     from .reddit_agents import RedditStoryDirectorAgent
     from .reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
-    from .reddit_longform import generate_25min_single_story_video
+    from .reddit_longform import generate_30min_single_story_video, generate_25min_single_story_video
     from .gemini_client import DEFAULT_FALLBACK_MODELS, resolve_gemini_api_keys
     from .batch_manager import BatchManager
     from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
@@ -115,7 +115,7 @@ except ImportError:
     from reddit_scraper import HIGH_CPM_SUBREDDITS, fetch_top_high_cpm_stories
     from reddit_agents import RedditStoryDirectorAgent
     from reddit_pipeline import run_reddit_story_pipeline, generate_teaser_short_video
-    from reddit_longform import generate_25min_single_story_video
+    from reddit_longform import generate_30min_single_story_video, generate_25min_single_story_video
     from gemini_client import DEFAULT_FALLBACK_MODELS, resolve_gemini_api_keys
     from batch_manager import BatchManager
     from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER, CheckpointManager
@@ -129,8 +129,8 @@ class RedditAutoPipelineRunner:
     Produz lotes contínuos no formato oficial batch_1, batch_2... (10 slots por lote: video_0 a video_9).
     
     REGRA OFICIAL DOS LOTES:
-    - video_0: Formato DUAL OBRIGATÓRIO (subpastas 'longform_25min/' e 'teaser_short/')
-    - video_1 a video_9: Shorts normais individuais em alta retenção (9:16 até 2.5 min com CTA)
+    - video_0: Formato DUAL OBRIGATÓRIO (subpastas 'longform_25min/' ou 'longform_30min/' e 'teaser_short/')
+    - video_1 a video_9: Shorts normais individuais em alta retenção (9:16 com história completa preservada e CTA)
     - DUAL BLACKLISTS:
       * video_0 consulta e grava em 'blacklist_longform'
       * video_1..video_9 consultam e gravam em 'blacklist_shorts'
@@ -156,7 +156,7 @@ class RedditAutoPipelineRunner:
         print(f"\n=======================================================")
         print(f"🔥 REDDIT STORY STUDIO - MODO AUTÔNOMO POR BATCHES")
         print(f"   Estrutura: batch_1, batch_2... (10 vídeos por lote)")
-        print(f"   Regra: video_0 = Dual (25min Long + Teaser) | video_1..9 = Shorts Normais")
+        print(f"   Regra: video_0 = Dual (30min Long + Teaser) | video_1..9 = Shorts Normais")
         print(f"   Dual Blacklists: blacklist_shorts.json & blacklist_longform.json")
         print(f"   Subreddits: {', '.join(self.target_subreddits)}")
         print(f"   Total a produzir nesta sessão: {count} slots de vídeo")
@@ -200,12 +200,12 @@ class RedditAutoPipelineRunner:
 
 
             if is_video_0:
-                print(f"\n🌟 [{completed+1}/{count}] Slot Especial: {batch_name}/{video_name} ({sub}) ➔ PRODUZINDO FORMATO DUAL (Longform 25min + Teaser Short)...")
+                print(f"\n🌟 [{completed+1}/{count}] Slot Especial: {batch_name}/{video_name} ({sub}) ➔ PRODUZINDO FORMATO DUAL (Longform 30min + Teaser Short)...")
                 try:
-                    # 1. Gera vídeo longo de 25min (16:9) na subpasta longform_25min/
-                    res_long = generate_25min_single_story_video(
+                    # 1. Gera vídeo longo de 30+ min (16:9) na subpasta longform_25min/ (ou longform/)
+                    res_long = generate_30min_single_story_video(
                         custom_post=selected_story,
-                        target_duration_minutes=25.0,
+                        target_duration_minutes=30.0,
                         custom_output_dir=target_slot
                     )
                     # 2. Gera teaser short vertical (9:16) na subpasta teaser_short/
@@ -222,7 +222,7 @@ class RedditAutoPipelineRunner:
                         video_type="longform"
                     )
                     print(f"✅ [{batch_name} | {video_name}] DUAL CONCLUÍDO (Registrado em blacklist_longform):")
-                    print(f"   🎬 Longform 25min: {target_slot}/longform_25min/")
+                    print(f"   🎬 Longform 30min: {target_slot}/longform_25min/")
                     print(f"   ⚡ Teaser Short 9:16: {target_slot}/teaser_short/")
                     completed += 1
                 except Exception as e:
