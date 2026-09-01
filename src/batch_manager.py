@@ -95,7 +95,107 @@ class BatchManager:
 
         target_dir = os.path.join(self.base_dir, f"batch_{target_batch}", f"video_{target_video}")
         os.makedirs(target_dir, exist_ok=True)
+        # Garante que o script de limpeza de mídia esteja presente no batch
+        self.generate_batch_cleaner(target_batch)
         return target_dir, target_batch, target_video
+
+    def generate_batch_cleaner(self, batch_num: int) -> str:
+        """
+        Gera um script autônomo (clean_media.py e clean_media.bat) dentro da pasta batch_N.
+        O script remove arquivos pesados de mídia (*.mp4, *.mp3, *.ass, chunks/)
+        liberando espaço no disco enquanto preserva 100% dos metadados (JSON, TXT, PNG, MD).
+        """
+        batch_dir = os.path.join(self.base_dir, f"batch_{batch_num}")
+        os.makedirs(batch_dir, exist_ok=True)
+        script_path = os.path.join(batch_dir, "clean_media.py")
+        
+        script_content = '''"""
+Script de Limpeza de Mídia do Lote (Reddit Minute)
+Remove arquivos pesados de vídeo (*.mp4) e áudio (*.mp3) de todos os slots video_0..video_9,
+preservando 100% dos metadados (metadata.json, script_data.json, tags, descrições e cards).
+"""
+import os
+import sys
+
+def clean_batch_media(batch_dir=None, dry_run=False):
+    target_dir = os.path.abspath(batch_dir or os.path.dirname(__file__))
+    print(f"🧹 Iniciando limpeza de mídia pesada em: {target_dir}")
+    
+    media_extensions = {".mp4", ".webm", ".mkv", ".avi", ".mov", ".mp3", ".wav", ".aac", ".m4a", ".ass", ".part"}
+    
+    deleted_files = 0
+    freed_bytes = 0
+    
+    for root, dirs, files in os.walk(target_dir):
+        for f in files:
+            ext = os.path.splitext(f)[1].lower()
+            if ext in media_extensions:
+                file_path = os.path.join(root, f)
+                try:
+                    size = os.path.getsize(file_path)
+                    if not dry_run:
+                        os.remove(file_path)
+                    deleted_files += 1
+                    freed_bytes += size
+                except Exception as e:
+                    print(f"   ⚠️ Erro ao remover {file_path}: {e}")
+                    
+        if os.path.basename(root).lower() == "chunks":
+            try:
+                if not os.listdir(root) and not dry_run:
+                    os.rmdir(root)
+            except Exception:
+                pass
+                
+    freed_mb = freed_bytes / (1024 * 1024)
+    freed_gb = freed_mb / 1024
+    size_str = f"{freed_gb:.2f} GB" if freed_gb >= 1.0 else f"{freed_mb:.1f} MB"
+    
+    print(f"✨ Limpeza concluída!")
+    print(f"   - Arquivos de mídia removidos: {deleted_files}")
+    print(f"   - Espaço liberado no disco: {size_str}")
+    print(f"   - Metadados e roteiros preservados: 100%")
+    return deleted_files, freed_bytes
+
+if __name__ == "__main__":
+    clean_batch_media()
+'''
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(script_content)
+
+        bat_path = os.path.join(batch_dir, "clean_media.bat")
+        with open(bat_path, "w", encoding="utf-8") as f:
+            f.write("@echo off\npython clean_media.py\npause\n")
+
+        return script_path
+
+    def clean_batch_media(self, batch_num: int, dry_run: bool = False) -> Tuple[int, int]:
+        """Executa a limpeza de mídia pesada para um lote específico programaticamente."""
+        batch_dir = os.path.join(self.base_dir, f"batch_{batch_num}")
+        if not os.path.exists(batch_dir):
+            return 0, 0
+        media_extensions = {".mp4", ".webm", ".mkv", ".avi", ".mov", ".mp3", ".wav", ".aac", ".m4a", ".ass", ".part"}
+        deleted = 0
+        freed = 0
+        for root, dirs, files in os.walk(batch_dir):
+            for f in files:
+                ext = os.path.splitext(f)[1].lower()
+                if ext in media_extensions:
+                    p = os.path.join(root, f)
+                    try:
+                        sz = os.path.getsize(p)
+                        if not dry_run:
+                            os.remove(p)
+                        deleted += 1
+                        freed += sz
+                    except Exception:
+                        pass
+        return deleted, freed
+
+    def generate_all_batch_cleaners(self):
+        """Gera os scripts de limpeza em todos os batches existentes."""
+        for b in self.list_batches():
+            self.generate_batch_cleaner(b)
 
     def get_summary(self) -> List[Dict[str, Any]]:
         """Gera um resumo estruturado de todos os batches cadastrados."""
