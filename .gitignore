@@ -31,7 +31,8 @@ assets/backgrounds/*.part
 *.ass
 *.mp3
 
-# Obsolete metrics
+# Obsolete metrics and archives
+*.zip
 METRICAS_VIDEOS.csv
 METRICAS_VIDEOS.md
 analytics/*.zip
@@ -41,3 +42,4 @@ analytics/*.csv
 # TTS Benchmark Directory
 !testes-tts/
 !testes-tts/**
+
