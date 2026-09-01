@@ -38,7 +38,9 @@ class RedditStoryDirectorAgent:
     - Shorts verticais 9:16 de até 2.5 minutos (com CTA obrigatório de engajamento ao público)
     - Vídeos Longos 16:9 de 25 minutos como uma HISTÓRIA ÚNICA contínua (e não um compilado de posts soltos).
     """
-    def __init__(self, model_name="gemini-flash-lite-latest", auto_fallback=True, auto_cooldown=True, fallback_models=None, api_keys=None):
+    def __init__(self, model_name="gemini-3.6-flash", auto_fallback=True, auto_cooldown=True, fallback_models=None, api_keys=None):
+
+
         self.model_name = model_name
         self.auto_fallback = auto_fallback
         self.auto_cooldown = auto_cooldown

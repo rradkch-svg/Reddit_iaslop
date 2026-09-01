@@ -13,8 +13,9 @@ class TestShortsScriptCTA(unittest.TestCase):
         sample_subs = ["r/maliciouscompliance", "r/pettyrevenge", "r/AITAH"]
         
         for sub in sample_subs:
-            story = director.synthesize_authentic_reddit_post(sub)
+            story = director._procedurally_generate_reddit_post(sub)
             script_data = director._generate_algorithmic_fallback_script(story)
+
 
             shorts_text = script_data.get("shorts_script", "").strip()
             

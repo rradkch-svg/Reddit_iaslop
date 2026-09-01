@@ -15,11 +15,12 @@ except ImportError:
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_FALLBACK_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-flash-latest",
+    "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
-    "gemini-pro-latest"
+    "gemini-flash-latest"
 ]
+
+
 
 def resolve_gemini_api_keys(explicit_keys: Optional[Any] = None) -> List[str]:
     """
@@ -182,8 +183,9 @@ def generate_with_resilience(
     response_mime_type: str = None,
     cooldown_callback = None,
     status_callback = None,
-    timeout_seconds: float = 15.0,
+    timeout_seconds: float = 60.0,
     max_cooldown_retries: int = 1,
+
     api_keys: Optional[Any] = None
 ) -> str:
     """

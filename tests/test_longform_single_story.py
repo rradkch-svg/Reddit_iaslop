@@ -10,7 +10,8 @@ class TestLongformSingleStory(unittest.TestCase):
         3. Cada capítulo tem numeração, título e texto de narração.
         """
         director = RedditStoryDirectorAgent()
-        story = director.synthesize_authentic_reddit_post("r/maliciouscompliance")
+        story = director._procedurally_generate_reddit_post("r/maliciouscompliance")
+
 
 
         longform_data = director._generate_algorithmic_25min_story(story, target_minutes=25.0)

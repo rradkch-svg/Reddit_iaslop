@@ -138,7 +138,8 @@ class RedditAutoPipelineRunner:
     def __init__(
         self,
         target_subreddits: Optional[List[str]] = None,
-        model_name: str = "gemini-flash-lite-latest",
+        model_name: str = "gemini-3.6-flash",
+
         output_dir: str = "checkpoint/auto_batches",
         batch_size: int = 10,
         checkpoint_manager: Optional[CheckpointManager] = None
