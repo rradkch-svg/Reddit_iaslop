@@ -1,4 +1,5 @@
-﻿import re
+import re
+import time
 import json
 import urllib.request
 import urllib.parse
@@ -24,10 +25,16 @@ HIGH_CPM_SUBREDDITS = [
 ]
 
 DEFAULT_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1"
 }
+
 
 # Coleção massiva de histórias virais completas de alto CPM para compilações longas (20+ minutos)
 EXPANDED_HIGH_CPM_STORIES = [
@@ -285,6 +292,7 @@ def fetch_top_high_cpm_stories(subreddits: Optional[List[str]] = None, max_stori
                 break
         if len(all_stories) >= max_stories:
             break
+        time.sleep(0.4)
 
     if not all_stories:
         app_logger.warning("[RedditScraper] Usando coleção expandida de histórias de alto CPM para compilação...")
