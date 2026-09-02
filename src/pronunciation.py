@@ -562,8 +562,6 @@ REDDIT_ENGLISH_PHONETIC_LEXICON: Dict[str, str] = {
     "coo": "C-O-O",
     "cto": "C-T-O",
     "vp": "vice president",
-    "it": "I-T",
-    "pr": "P-R",
 }
 
 # =============================================================================
@@ -677,7 +675,21 @@ class RedditPhoneticEngine:
             pattern = r'\b' + re.escape(term) + r'\b'
             result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
 
-        # 4. Limpa espaços duplos
+        # 4. Contextual Information Technology (I.T.) - apenas em contexto técnico/departamental explícito
+        result = re.sub(
+            r'\b(?:I\.?T\.?|IT)\s+(department|team|staff|worker|workers|support|director|manager|security|infrastructure|consultant|consultants|specialist|specialists|guy|person|helpdesk|field|systems|admin|administrator|professionals?)\b',
+            r'I.T. \1',
+            result,
+            flags=re.IGNORECASE
+        )
+        result = re.sub(
+            r'\b(working\s+in|job\s+in|career\s+in|worked\s+in)\s+(?:I\.?T\.?|IT)\b',
+            r'\1 I.T.',
+            result,
+            flags=re.IGNORECASE
+        )
+
+        # 5. Limpa espaços duplos
         result = re.sub(r'\s+', ' ', result).strip()
         return result
 

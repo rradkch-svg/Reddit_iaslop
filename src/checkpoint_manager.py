@@ -169,6 +169,9 @@ class CheckpointManager:
         new_entry = {
             "tema": tema_title,
             "core_entity": core_entity,
+            "author": (topic_data.get("author") or "").strip(),
+            "subreddit": (topic_data.get("subreddit") or "").strip(),
+            "url": (topic_data.get("url") or "").strip(),
             "format": v_norm,
             "hook": topic_data.get("hook") or topic_data.get("hook_text") or "",
             "explicacao_tecnica": topic_data.get("explicacao_tecnica") or topic_data.get("body") or "",
@@ -676,13 +679,16 @@ class CheckpointManager:
         Extrai de forma resiliente metadados estruturados (tema, hook, body, etc.)
         a partir de arquivos de roteiro (script_data.json) ou metadados (metadata.txt, etc.).
         """
-        # 1. Procura script_data.json (prioridade estruturada)
+        # 1. Procura script_data.json / metadata.json (prioridade estruturada)
         script_candidates = [
+            os.path.join(v_path, "longform_30min", "script_data.json"),
             os.path.join(v_path, "longform_25min", "script_data.json"),
             os.path.join(v_path, "script_data.json"),
+            os.path.join(v_path, "metadata.json"),
             os.path.join(v_path, "teaser_short", "script_data.json"),
         ] if is_longform else [
             os.path.join(v_path, "script_data.json"),
+            os.path.join(v_path, "metadata.json"),
             os.path.join(v_path, "teaser_short", "script_data.json"),
         ]
 
@@ -696,6 +702,9 @@ class CheckpointManager:
                         return {
                             "tema": title,
                             "core_entity": data.get("core_entity"),
+                            "author": (data.get("author") or "").strip(),
+                            "subreddit": (data.get("subreddit") or "").strip(),
+                            "url": (data.get("url") or "").strip(),
                             "hook": data.get("hook") or data.get("hook_text") or data.get("opening_hook", ""),
                             "explicacao_tecnica": data.get("explicacao_tecnica") or data.get("body") or data.get("shorts_script") or data.get("longform_script", "")
                         }
@@ -706,6 +715,8 @@ class CheckpointManager:
         meta_candidates = [
             os.path.join(v_path, "metadata.txt"),
             os.path.join(v_path, "metadata_youtube.txt"),
+            os.path.join(v_path, "longform_30min", "metadata.txt"),
+            os.path.join(v_path, "longform_30min", "metadata_youtube.txt"),
             os.path.join(v_path, "longform_25min", "metadata.txt"),
             os.path.join(v_path, "longform_25min", "metadata_youtube.txt"),
             os.path.join(v_path, "teaser_short", "metadata_teaser.txt")
@@ -720,6 +731,8 @@ class CheckpointManager:
                     title = None
                     hook = None
                     body = None
+                    author = ""
+                    subreddit = ""
                     for idx, line in enumerate(lines):
                         if not title and re.search(r"\b(T[ÍI]TULO|TITLE)\b", line, re.IGNORECASE):
                             if ":" in line and len(line.split(":", 1)[1].strip()) > 3:
@@ -737,10 +750,16 @@ class CheckpointManager:
                                 if next_line and not next_line.startswith("#") and not re.search(r"\b(HASHTAGS|TAGS)\b", next_line, re.IGNORECASE):
                                     body = next_line
                                     break
+                        if re.search(r"\b(AUTOR|AUTHOR)\b", line, re.IGNORECASE) and ":" in line:
+                            author = line.split(":", 1)[1].strip()
+                        if re.search(r"\b(SUBREDDIT)\b", line, re.IGNORECASE) and ":" in line:
+                            subreddit = line.split(":", 1)[1].strip()
 
                     if title:
                         return {
                             "tema": title,
+                            "author": author,
+                            "subreddit": subreddit,
                             "hook": hook or "",
                             "explicacao_tecnica": body or ""
                         }

@@ -1,115 +1,94 @@
 """
-Módulo de Deduplicação Heurística de Contexto e Sanitização de Títulos Automotivos.
+Módulo de Deduplicação Heurística de Contexto e Sanitização de Histórias do Reddit (Reddit Minute).
 Garante:
-1. Títulos com teto estrito de 100 caracteres (<= 100 dígitos).
-2. Remoção absoluta de sufixos clichês como '| Segredos da Engenharia'.
-3. Detecção heurística de duplicatas contextuais (mesmo veículo + mesmo domínio mecânico ou tema semântico),
-   impedindo a repetição de assuntos mesmo quando os títulos são formulados com palavras completamente distintas.
+1. Títulos com teto estrito de 100 caracteres (<= 100 dígitos) e sem clichês.
+2. Deduplicação multi-fatorial de histórias (mesmo autor, mesma URL, mesmo enredo/entidade, sobreposição de palavras-chave).
+3. Detecção heurística de conflitos semânticos análogos (mesmo arquétipo de conflito + mesmos atores centrais),
+   impedindo a repetição de histórias mesmo quando formuladas com variações superficiais de vocabulário.
 """
 
 import re
 import difflib
 from typing import Dict, Any, List, Set, Tuple, Optional, Union
 
-# Dicionário de taxonomia de domínios e subsistemas de engenharia automotiva
-TECHNICAL_DOMAINS: Dict[str, List[str]] = {
-    "AERODINAMICA_DOWNFORCE": [
-        "downforce", "asa", "aero", "aerodinamica", "arrasto", "difusor", "venturi",
-        "efeito solo", "drs", "flaps", "vortex", "ground effect", "sustentacao",
-        "teto", "duto", "spoiler", "splitter", "canards"
+# =============================================================================
+# Arquétipos Narrativos e Domínios de Conflito do Reddit
+# =============================================================================
+REDDIT_CONFLICT_DOMAINS: Dict[str, List[str]] = {
+    "WORKPLACE_MALICIOUS_COMPLIANCE": [
+        "boss", "manager", "handbook", "overtime", "shift", "clock out", "clocked out",
+        "insubordination", "fired", "hr", "human resources", "severance", "micromanager",
+        "promotion", "paycut", "raise", "salary", "pto", "vacation", "wfh", "return to office",
+        "cubicle", "employee", "director", "executive", "vp", "billing", "contractor"
     ],
-    "SOBREALIMENTACAO_TURBO": [
-        "turbo", "biturbo", "twin turbo", "twin-turbo", "supercharger", "compressor",
-        "intercooler", "boost", "wastegate", "lag", "water-spray", "water spray",
-        "mivec", "pressao", "pressurizacao", "blow-off", "spool"
+    "HOUSING_LANDLORD_TENANT": [
+        "landlord", "tenant", "deposit", "security deposit", "rent", "lease", "eviction",
+        "evicted", "repairs", "apartment", "unit", "landlord tenant", "property manager",
+        "inspector", "damages", "water leak", "mold", "rent increase"
     ],
-    "MOTORIZACAO_COMBUSTAO": [
-        "v10", "v12", "v8", "v6", "w16", "aspirado", "9000 rpm", "rpm", "giro",
-        "som puro", "ronco", "escapamento", "coletor", "valvulas", "virabrequim",
-        "bloco", "ferro", "flat-plane", "crossplane", "wankel", "4-rotor", "rotativo",
-        "taxa de compressao", "cilindrada", "cilindros", "combustao", "ignicao"
+    "LEGAL_COURT_DAMAGES": [
+        "small claims", "lawyer", "lawsuit", "sue", "sued", "court", "judge", "settlement",
+        "damages", "attorney", "subpoena", "legal action", "treble damages", "judgment",
+        "deposition", "police", "officer", "fine", "citation", "statute"
     ],
-    "TRANSMISSAO_DRIVETRAIN": [
-        "pdk", "dupla embreagem", "dct", "cambio", "transmissao", "sequencial",
-        "manual", "paddle shift", "launch control", "embreagem", "trocas",
-        "arrancada", "relacao de marcha", "e-diff", "diferencial"
+    "FAMILY_INHERITANCE_WEDDING": [
+        "in-law", "mother-in-law", "father-in-law", "mil", "fil", "wedding", "bride",
+        "groom", "inheritance", "will", "estate", "sibling", "parents", "custody",
+        "trust fund", "golden child", "stepmom", "stepdad", "ex-wife", "ex-husband"
     ],
-    "CHASSI_MATERIAIS_LEVES": [
-        "fibra de carbono", "teto de carbono", "peso", "alivio", "monocoque",
-        "titanio", "magnesio", "distribuicao de peso", "50-50", "centro de gravidade",
-        "rigidez", "torcional", "tubular", "resina"
+    "NEIGHBORHOOD_HOA_BOUNDARY": [
+        "hoa", "homeowners association", "neighbor", "fence", "property line", "easement",
+        "parking", "towing", "towed", "driveway", "yard", "tree", "property boundary",
+        "noise complaint", "hoa board", "hoa president"
     ],
-    "SUSPENSAO_DINAMICA": [
-        "suspensao", "amortecedor", "magnetica", "bose", "multilink",
-        "wishbone", "camber", "caster", "anti-roll", "eletromagnetica",
-        "geometria", "estabilidade", "rolagem"
+    "FINANCIAL_INDEPENDENCE_SCAM": [
+        "scam", "debt", "credit", "taxes", "tax fraud", "irs", "refund", "bank",
+        "financial", "audit", "forensic audit", "embezzlement", "wire fraud", "stolen"
     ],
-    "TRACAO_VETORIZACAO": [
-        "attesa", "quattro", "awd", "4wd", "tracao integral", "diferencial",
-        "vetorizacao de torque", "lsd", "torque vectoring", "torque split", "4x4"
-    ],
-    "FRENAGEM_TERMICA": [
-        "freio", "carbono ceramica", "ceramica", "pastilhas", "calipers",
-        "frenagem", "fading", "dissipacao", "pistas", "discos ventilados"
-    ],
-    "HISTORICO_RACING_LEMANS": [
-        "le mans", "nurburgring", "grupo b", "f1", "cauda curta", "banido",
-        "homologacao", "recorde", "venceu", "24 horas", "campeonato"
-    ],
-    "PROPULSAO_AERONAUTICA_JATO": [
-        "turbina", "pos-combustao", "afterburner", "turbofan", "turbojet", "turboelice",
-        "turboprop", "ramjet", "scramjet", "mach", "compressao axial", "empuxo",
-        "aviacao", "caca", "blackbird", "sr-71", "concorde", "j58", "ge90", "tf34", "spitfire", "merlin"
-    ],
-    "PROPULSAO_MILITAR_BLINDADOS": [
-        "tanque", "turbina a gas", "abrams", "m1 abrams", "leopard", "blindado",
-        "maybach", "mtu", "honeywell agt1500", "panzer", "tiger", "t-90", "t-72", "blindagem"
-    ],
-    "MOTOCICLETAS_ALTO_GIRO": [
-        "moto", "supermoto", "desmodromico", "desmodromica", "ninja h2r", "h2r",
-        "panigale", "v4r", "crossplane", "16000 rpm", "yamaha r1", "hayabusa", "cbx 1000", "supercharger centrifugo"
-    ],
-    "PROPULSAO_ELETRICA_ALTA_TENSAO": [
-        "eletrico", "inversor", "sic", "carbeto de silicio", "800v", "rotor de carbono",
-        "fluxo axial", "yasa", "rimac", "nevera", "mcmurtry", "speirling", "plaid", "taycan", "torque instantaneo"
-    ],
-    "CICLO_DIESEL_ALTA_PRESSAO": [
-        "diesel", "turbodiesel", "common rail", "bomba injetora", "cummins", "duramax",
-        "powerstroke", "tdi", "r10 tdi", "r18 tdi", "pressao de injecao", "wartsila"
-    ],
-    "CICLO_WANKEL_ROTATIVO": [
-        "wankel", "rotativo", "apex seal", "apex seals", "camara trocoidal", "13b",
-        "20b", "r26b", "4 rotores", "4-rotor", "mazda 787b", "queima de oleo", "triangulo"
+    "PETTY_REVENGE_ENTITLED": [
+        "karen", "entitled", "customer", "parking spot", "queue", "cut in line",
+        "revenge", "petty", "airplane", "seat", "flight", "grocery", "restaurant"
     ]
 }
 
-# Stopwords em português e termos vazios para filtragem contextual
-STOPWORDS_PT: Set[str] = {
-    "o", "a", "os", "as", "um", "uma", "uns", "umas",
-    "de", "da", "do", "dos", "das", "em", "no", "na", "nos", "nas",
-    "por", "para", "com", "como", "que", "se", "seu", "sua", "seus", "suas",
-    "ao", "aos", "pelo", "pela", "pelos", "pelas", "sem", "sob", "sobre",
-    "e", "ou", "mas", "porque", "por que", "qual", "quais", "quem",
-    "segredo", "segredos", "fisica", "engenharia", "mecanica", "tecnologia",
-    "insana", "insano", "brutal", "incrivel", "revolucionario", "obra", "prima",
-    "tudo", "nada", "mais", "menos", "muito", "pouco", "este", "esta", "esse", "essa"
+# Stopwords em inglês e português para filtragem conceitual
+STOPWORDS_EN_PT: Set[str] = {
+    # English stopwords
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "with",
+    "by", "from", "up", "about", "into", "over", "after", "is", "are", "was", "were",
+    "be", "been", "being", "have", "has", "had", "do", "does", "did", "how", "why",
+    "what", "when", "where", "who", "which", "this", "that", "these", "those", "my",
+    "your", "his", "her", "its", "our", "their", "i", "you", "he", "she", "it",
+    "we", "they", "me", "him", "her", "us", "them", "so", "as", "if", "not", "all",
+    "any", "out", "very", "just", "got", "get", "told", "said", "one", "two", "back",
+    "off", "down", "then", "now", "here", "there", "even", "only", "would", "could",
+    "should", "story", "stories", "reddit", "post", "update", "part", "chapter", "full",
+    # Portuguese stopwords
+    "o", "a", "os", "as", "um", "uma", "uns", "umas", "de", "da", "do", "dos", "das",
+    "em", "no", "na", "nos", "nas", "por", "para", "com", "como", "que", "se", "seu",
+    "sua", "seus", "suas", "ao", "aos", "pelo", "pela", "pelos", "pelas", "sem", "sob"
 }
 
-# Sufixos e clichês proibidos em títulos
+# Sufixos e clichês proibidos em títulos do Reddit
 FORBIDDEN_TITLE_PATTERNS: List[str] = [
+    r"\|\s*Reddit\s+Stories\b",
+    r"-\s*Reddit\s+Stories\b",
+    r"\|\s*Reddit\s+Minute\b",
+    r"-\s*Reddit\s+Minute\b",
     r"\|\s*Segredos?\s+da\s+Engenharia\b",
     r"-\s*Segredos?\s+da\s+Engenharia\b",
-    r"\|\s*Curiosidades?\s+Automotivas?\b",
-    r"\|\s*AutoTech\b",
-    r"\|\s*AI\s+Slop\b",
-    r"🏎️\s*",
+    r"\[\s*30\s*MIN\s*FULL\s*STORY\s*\]",
+    r"\[\s*25\s*MIN\s*FULL\s*STORY\s*\]",
+    r"#Shorts\b",
+    r"#RedditStories\b",
     r"🔥\s*",
-    r"⚡\s*"
+    r"⚡\s*",
+    r"👉\s*"
 ]
 
 def sanitize_and_cap_title(title: str, max_length: int = 100) -> str:
     """
-    Limpa sufixos de clichês (ex: '| Segredos da Engenharia', emojis prefixados)
+    Limpa sufixos de clichês (ex: '| Reddit Stories', tags, emojis prefixados)
     e garante que o título do vídeo NUNCA tenha mais de max_length caracteres (padrão 100).
     Realiza quebra elegante na última palavra para nunca cortar letras no meio.
     """
@@ -140,62 +119,75 @@ def sanitize_and_cap_title(title: str, max_length: int = 100) -> str:
 
 def extract_canonical_entity(text: str) -> str:
     """
-    Extrai e normaliza a entidade veicular central (marca + modelo + chassi/geração),
-    removendo adjetivação e verbos introdutórios.
+    Extrai e normaliza o ator/entidade central do conflito (ex: landlord, manager, neighbor, hoa, mother-in-law),
+    removendo marcadores de subreddits (AITA, WIBTA, TIFU) e adjetivação.
     """
     if not text:
         return ""
-    
-    parts = text.split(":")
-    main_part = parts[0] if len(parts) > 1 else text
-    
-    # Remove chamadas iniciais
-    cleaned = re.sub(
-        r"^(O Segredo d[oa]|Como funciona o|Por que o|A física d[oa]|A engenharia d[oa]|Tudo sobre o|O Motor d[oa]|A Asa d[oa]|A Suspensão d[oa]|A Insana Inovação d[oa]|A Insana Aerodinâmica d[oa]|A Insana Física d[oa]|O Sistema d[oa]|O Monstro d[oa]|O Rugido d[oa]|A Brutalidade Mecânica d[oa]|A Complexa Engenharia d[oa]|A Genialidade d[oa]|A Engenharia Implacável d[oa]|A Engenharia Secreta d[oa]|A Engenharia do|A Engenharia Absurda d[oa])\s*",
-        "", main_part, flags=re.IGNORECASE
-    )
-    
-    cleaned = re.sub(r"[^\w\s\-\.]", " ", cleaned)
-    cleaned = re.sub(r"\b(e seu|e sua|no|na|com|de|da|do|dos|das|para|sobre|o|a|os|as|que|por|ser|bom|demais)\b", " ", cleaned, flags=re.IGNORECASE)
-    
-    words = [w.strip() for w in cleaned.split() if w.strip()]
-    return " ".join(words[:6]).strip() if words else text.strip()
 
-def classify_technical_domains(text: str) -> List[str]:
-    """
-    Identifica quais domínios e sistemas mecânicos estão presentes no texto (título, hook ou explicação).
-    """
+    # Remove prefixos clássicos do Reddit
+    cleaned = re.sub(
+        r"^(AITA\s+(?:for|if)|AITAH\s+(?:for|if)|WIBTA\s+(?:for|if)|TIFU\s+by|Update\s*:?|Part\s*\d+\s*:?)\s*",
+        "", str(text).strip(), flags=re.IGNORECASE
+    )
+
+    t_low = cleaned.lower()
+    
+    # Entidades canônicas mapeadas prioritariamente
+    core_actors = [
+        "mother-in-law", "father-in-law", "sister-in-law", "brother-in-law",
+        "landlord", "property manager", "tenant", "roommate",
+        "micromanager", "boss", "manager", "executive", "director", "supervisor",
+        "coworker", "colleague", "employee", "contractor",
+        "neighbor", "hoa president", "hoa board", "hoa",
+        "bride", "groom", "in-laws", "sibling", "brother", "sister",
+        "client", "customer", "lawyer", "police"
+    ]
+    for actor in core_actors:
+        if re.search(rf"\b{re.escape(actor)}\b", t_low):
+            return actor
+
+    # Fallback: primeiras palavras significativas
+    words = [w.strip() for w in re.sub(r"[^\w\s\-]", " ", cleaned).split() if w.lower() not in STOPWORDS_EN_PT and len(w) > 2]
+    return " ".join(words[:3]).strip() if words else cleaned[:30].strip()
+
+def classify_reddit_domains(text: str) -> List[str]:
+    """Identifica quais domínios e arquétipos narrativos estão presentes no texto."""
+    if not text:
+        return []
     t_low = text.lower()
-    matched_domains = []
-    for domain, keywords in TECHNICAL_DOMAINS.items():
+    matched = []
+    for domain, keywords in REDDIT_CONFLICT_DOMAINS.items():
         for kw in keywords:
             if re.search(rf"\b{re.escape(kw)}\b", t_low):
-                if domain not in matched_domains:
-                    matched_domains.append(domain)
+                if domain not in matched:
+                    matched.append(domain)
                 break
-    return matched_domains
+    return matched
 
 def extract_semantic_stems(text: str) -> Set[str]:
-    """
-    Extrai o conjunto de tokens conceituais significativos (sem stopwords e com mais de 2 letras).
-    """
+    """Extrai conjunto de tokens conceituais significativos em minúsculas (sem stopwords)."""
+    if not text:
+        return set()
     clean = re.sub(r"[^\w\s]", " ", text.lower())
     tokens = [w.strip() for w in clean.split() if len(w.strip()) > 2]
-    return {w for w in tokens if w not in STOPWORDS_PT}
+    return {w for w in tokens if w not in STOPWORDS_EN_PT}
 
 class ContextualTopicAuditor:
     """
-    Motor Heurístico de Auditoria e Deduplicação Contextual.
-    Compara o candidato com a base histórica de vídeos já produzidos sob 4 dimensões:
-    1. Entidade Veicular / Máquina (mesmo carro ou variação direta).
-    2. Domínio Técnico de Engenharia (mesmo subsistema mecânico).
-    3. Sobreposição Semântica de Ação / Princípio Físico (Jaccard de Stems).
-    4. Proximidade Estrutural e Textual (difflib SequenceMatcher).
+    Motor Heurístico de Auditoria e Deduplicação Contextual para o Reddit Story Studio.
+    Avalia novos candidatos contra a base histórica de vídeos sob 6 dimensões:
+    1. Autor Único: Bloqueia posts repetidos do mesmo autor (`author` ou `u/author`).
+    2. URL/ID de Post: Bloqueia submissões com mesma URL ou identificador.
+    3. Similaridade Textual de Título: SequenceMatcher com teto de 60%.
+    4. Entidade + Domínio de Conflito: Bloqueia mesmo ator central no mesmo arquétipo narrativo.
+    5. Jaccard de Stems Semânticos: Mede interseção lexical de enredo (teto de 45%).
+    6. Similaridade de Corpo da História: Mede sobreposição de fatos no texto completo.
     """
 
-    def __init__(self, vehicle_sim_threshold: float = 0.70, text_sim_threshold: float = 0.65):
-        self.vehicle_sim_threshold = vehicle_sim_threshold
-        self.text_sim_threshold = text_sim_threshold
+    def __init__(self, title_sim_threshold: float = 0.60, jaccard_threshold: float = 0.45):
+        self.title_sim_threshold = title_sim_threshold
+        self.jaccard_threshold = jaccard_threshold
 
     def evaluate_candidate(
         self,
@@ -203,104 +195,109 @@ class ContextualTopicAuditor:
         existing_items: List[Dict[str, Any]]
     ) -> Tuple[bool, float, str]:
         """
-        Avalia se o tema candidato é uma repetição de assunto em relação aos itens existentes.
-        
-        Retorna:
-        - `is_duplicate` (bool): True se for duplicata contextual, False se for inédito.
-        - `confidence` (float): Nível de confiança da detecção (0.0 a 1.0).
-        - `reason` (str): Justificativa técnica e detalhada para rejeição ou aprovação.
+        Avalia se a história proposta é uma duplicata de alguma história já registrada na Blacklist.
         """
         if not candidate_topic:
             return False, 0.0, "Tema vazio"
 
-        cand_title = candidate_topic.get("tema") if isinstance(candidate_topic, dict) else str(candidate_topic)
+        cand_dict = candidate_topic if isinstance(candidate_topic, dict) else {"tema": str(candidate_topic)}
+        cand_title = cand_dict.get("tema") or cand_dict.get("title") or cand_dict.get("titulo") or ""
         cand_title = sanitize_and_cap_title(cand_title)
-        cand_hook = candidate_topic.get("hook", "") if isinstance(candidate_topic, dict) else ""
-        cand_tech = candidate_topic.get("explicacao_tecnica", "") if isinstance(candidate_topic, dict) else ""
-        
-        cand_full_text = f"{cand_title} {cand_hook} {cand_tech}".strip()
-        cand_entity = extract_canonical_entity(cand_title)
-        cand_domains = classify_technical_domains(cand_full_text)
-        cand_stems = extract_semantic_stems(cand_full_text)
-        cand_entity_stems = extract_semantic_stems(cand_entity)
+        cand_author = (cand_dict.get("author") or "").strip().lower()
+        cand_url = (cand_dict.get("url") or "").strip().lower()
+        cand_sub = (cand_dict.get("subreddit") or "").strip().lower()
+        cand_body = cand_dict.get("body") or cand_dict.get("explicacao_tecnica") or cand_dict.get("hook") or ""
+
+        cand_full = f"{cand_title} {cand_body}".strip()
+        cand_entity = cand_dict.get("core_entity") or extract_canonical_entity(cand_title)
+        cand_domains = classify_reddit_domains(cand_full)
+        cand_stems = extract_semantic_stems(cand_title)
+        cand_body_stems = extract_semantic_stems(cand_body)
 
         for existing in existing_items:
-            ex_title = existing.get("tema") or existing.get("titulo") or ""
+            ex_title = existing.get("tema") or existing.get("title") or existing.get("titulo") or ""
             ex_title = sanitize_and_cap_title(ex_title)
-            ex_hook = existing.get("hook", "")
-            ex_tech = existing.get("explicacao_tecnica") or existing.get("dissertacao_resumo") or ""
-            ex_full_text = f"{ex_title} {ex_hook} {ex_tech}".strip()
+            ex_author = (existing.get("author") or "").strip().lower()
+            ex_url = (existing.get("url") or "").strip().lower()
+            ex_sub = (existing.get("subreddit") or "").strip().lower()
+            ex_body = existing.get("explicacao_tecnica") or existing.get("body") or existing.get("hook") or ""
             
+            ex_full = f"{ex_title} {ex_body}".strip()
             ex_entity = existing.get("core_entity") or extract_canonical_entity(ex_title)
-            ex_domains = classify_technical_domains(ex_full_text)
-            ex_stems = extract_semantic_stems(ex_full_text)
-            ex_entity_stems = extract_semantic_stems(ex_entity)
+            ex_domains = classify_reddit_domains(ex_full)
+            ex_stems = extract_semantic_stems(ex_title)
+            ex_body_stems = extract_semantic_stems(ex_body)
 
-            # 1. Similaridade Textual Direta (difflib)
+            # 1. Verificação de Autor (se não for placeholder genérico)
+            if cand_author and ex_author and cand_author not in ("u/reddituser", "reddituser", "unknown", "u/unknown"):
+                if cand_author == ex_author:
+                    return (
+                        True,
+                        1.0,
+                        f"Autor '{cand_author}' já possui história produzida anteriormente ('{ex_title[:45]}...')"
+                    )
+
+            # 2. Verificação de URL / Link
+            if cand_url and ex_url and len(cand_url) > 10:
+                if cand_url == ex_url:
+                    return (
+                        True,
+                        1.0,
+                        f"URL idêntica à história já registrada: {cand_url}"
+                    )
+
+            # 3. Similaridade Textual Direta do Título (difflib SequenceMatcher)
             text_sim = difflib.SequenceMatcher(None, cand_title.lower(), ex_title.lower()).ratio()
-            if text_sim >= self.text_sim_threshold:
+            if text_sim >= self.title_sim_threshold:
                 return (
                     True,
                     text_sim,
-                    f"Título textualmente muito similar ({text_sim:.0%}) ao vídeo já gravado '{ex_title}'"
+                    f"Título textualmente similar ({text_sim:.0%}) ao vídeo já gravado '{ex_title}'"
                 )
 
-            # 2. Avaliação de Entidade Veicular / Máquina
-            entity_jaccard = 0.0
-            if cand_entity_stems and ex_entity_stems:
-                entity_overlap = cand_entity_stems.intersection(ex_entity_stems)
-                entity_union = cand_entity_stems.union(ex_entity_stems)
-                entity_jaccard = len(entity_overlap) / len(entity_union) if entity_union else 0.0
-
-            entity_str_sim = difflib.SequenceMatcher(None, cand_entity.lower(), ex_entity.lower()).ratio()
-            same_vehicle = (
-                entity_jaccard >= self.vehicle_sim_threshold or
-                entity_str_sim >= 0.78 or
-                (len(cand_entity) >= 4 and cand_entity.lower() in ex_title.lower()) or
-                (len(ex_entity) >= 4 and ex_entity.lower() in cand_title.lower())
+            # 4. Sobreposição de Entidade Canônica + Domínio de Conflito
+            same_entity = (
+                cand_entity and ex_entity and
+                (cand_entity.lower() == ex_entity.lower() or
+                 difflib.SequenceMatcher(None, cand_entity.lower(), ex_entity.lower()).ratio() >= 0.80)
             )
-
-            # 3. Se for o mesmo veículo / máquina:
-            if same_vehicle:
-                # 3a. Checa sobreposição de Domínios Técnicos de Engenharia
-                domain_overlap = set(cand_domains).intersection(set(ex_domains))
-                if domain_overlap:
-                    domain_names = ", ".join(list(domain_overlap))
-                    return (
-                        True,
-                        0.95,
-                        f"O veículo '{cand_entity}' já possui vídeo abordando o domínio mecânico [{domain_names}] em '{ex_title}'"
-                    )
-
-                # 3b. Checa sobreposição de Stems Semânticos (Ações e Componentes)
-                stem_overlap = cand_stems.intersection(ex_stems) - cand_entity_stems
-                if len(stem_overlap) >= 3:
+            domain_overlap = set(cand_domains).intersection(set(ex_domains))
+            
+            if same_entity and domain_overlap:
+                stem_overlap = cand_stems.intersection(ex_stems)
+                if len(stem_overlap) >= 2:
                     overlap_words = ", ".join(list(stem_overlap)[:4])
                     return (
                         True,
                         0.90,
-                        f"O veículo '{cand_entity}' já foi abordado com termos e conceitos mecânicos análogos ({overlap_words}) em '{ex_title}'"
+                        f"Mesma entidade central ('{cand_entity}') no domínio [{', '.join(domain_overlap)}] com termos análogos ({overlap_words}) em '{ex_title}'"
                     )
 
-                # 3c. Se for um modelo de nicho super específico sem domínio explícito, bloqueia duplicação de veículo no mesmo canal
-                if len(cand_entity_stems) >= 2 and entity_jaccard >= 0.85:
+            # 5. Jaccard Global de Stems do Título
+            if cand_stems and ex_stems:
+                overlap = cand_stems.intersection(ex_stems)
+                union = cand_stems.union(ex_stems)
+                jaccard = len(overlap) / len(union) if union else 0.0
+                if jaccard >= self.jaccard_threshold:
+                    overlap_words = ", ".join(list(overlap)[:4])
                     return (
                         True,
-                        0.85,
-                        f"Veículo '{cand_entity}' já foi protagonista do vídeo '{ex_title}'"
+                        jaccard,
+                        f"Alta sobreposição de palavras-chave ({jaccard:.0%}, termos: {overlap_words}) com '{ex_title}'"
                     )
 
-            # 4. Caso os títulos sejam semanticamente quase idênticos mesmo com veículos diferentes
-            stems_intersection = cand_stems.intersection(ex_stems)
-            stems_union = cand_stems.union(ex_stems)
-            jaccard_global = len(stems_intersection) / len(stems_union) if stems_union else 0.0
-            if jaccard_global >= 0.65:
-                return (
-                    True,
-                    jaccard_global,
-                    f"Alta sobreposição temática e semântica ({jaccard_global:.0%}) com o vídeo '{ex_title}'"
-                )
+            # 6. Jaccard de Corpo da História (quando disponível)
+            if len(cand_body_stems) >= 15 and len(ex_body_stems) >= 15:
+                b_overlap = cand_body_stems.intersection(ex_body_stems)
+                b_union = cand_body_stems.union(ex_body_stems)
+                b_jaccard = len(b_overlap) / len(b_union) if b_union else 0.0
+                if b_jaccard >= 0.40:
+                    return (
+                        True,
+                        b_jaccard,
+                        f"Enredo e texto da história altamente sobrepostos ({b_jaccard:.0%}) ao vídeo '{ex_title}'"
+                    )
 
-        return False, 0.0, "Tema 100% inédito e aprovado"
+        return False, 0.0, "Tema inédito e aprovado"
 
 DEFAULT_CONTEXTUAL_AUDITOR = ContextualTopicAuditor()

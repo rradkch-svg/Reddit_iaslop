@@ -134,19 +134,47 @@ def scrape_subreddit_rss(subreddit: str = "maliciouscompliance", time_filter: st
     return posts
 
 def fetch_top_high_cpm_stories(subreddits: Optional[List[str]] = None, max_stories: int = 10) -> List[Dict[str, Any]]:
+    """
+    Busca histórias de alto CPM no Reddit com distribuição balanceada (Round-Robin) entre subreddits
+    e garantia de diversidade de autores e temas.
+    """
     target_subs = [s.replace("r/", "").strip() for s in subreddits] if subreddits else HIGH_CPM_SUBREDDITS
-    all_stories = []
+    sub_stories_map: Dict[str, List[Dict[str, Any]]] = {}
 
     for sub in target_subs:
-        stories = scrape_subreddit_rss(subreddit=sub, time_filter="month", limit=10)
-        for s in stories:
-            if s not in all_stories:
-                all_stories.append(s)
-            if len(all_stories) >= max_stories:
-                break
+        stories = scrape_subreddit_rss(subreddit=sub, time_filter="month", limit=6)
+        if stories:
+            sub_stories_map[sub] = stories
+        time.sleep(0.3)
+
+    # Interleaving (Round-Robin) para garantir que cada slot de vídeo venha de um subreddit diferente
+    all_stories = []
+    seen_authors = set()
+    seen_titles = set()
+
+    max_depth = max((len(v) for v in sub_stories_map.values()), default=0)
+    for depth in range(max_depth):
+        for sub in target_subs:
+            if sub in sub_stories_map and depth < len(sub_stories_map[sub]):
+                story = sub_stories_map[sub][depth]
+                title_key = story.get("title", "").strip().lower()
+                author_key = story.get("author", "").strip().lower()
+                
+                # Deduplicação imediata de autor e título
+                if title_key in seen_titles:
+                    continue
+                if author_key and author_key not in ("u/reddituser", "reddituser", "unknown") and author_key in seen_authors:
+                    continue
+
+                seen_titles.add(title_key)
+                if author_key and author_key not in ("u/reddituser", "reddituser", "unknown"):
+                    seen_authors.add(author_key)
+
+                all_stories.append(story)
+                if len(all_stories) >= max_stories:
+                    break
         if len(all_stories) >= max_stories:
             break
-        time.sleep(0.4)
 
     if not all_stories:
         app_logger.info("[RedditScraper] Raspagem ao vivo indisponível. Solicitando ao Gemini IA a criação de história inédita no molde exato do Reddit...")
