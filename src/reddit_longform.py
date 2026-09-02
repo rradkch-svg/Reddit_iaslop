@@ -12,6 +12,7 @@ try:
     from .reddit_agents import RedditStoryDirectorAgent, PERSONA_VOICE_MAP
     from .reddit_audio import RedditAudioEngine
     from .reddit_visuals import RedditVisualEngine
+    from .reddit_thumbnails import RedditThumbnailEngine
     from .reddit_subtitles import generate_reddit_ass_subtitles, generate_reddit_srt_subtitles
     from .reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from .batch_manager import BatchManager
@@ -22,6 +23,7 @@ except ImportError:
     from reddit_agents import RedditStoryDirectorAgent, PERSONA_VOICE_MAP
     from reddit_audio import RedditAudioEngine
     from reddit_visuals import RedditVisualEngine
+    from reddit_thumbnails import RedditThumbnailEngine
     from reddit_subtitles import generate_reddit_ass_subtitles, generate_reddit_srt_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from batch_manager import BatchManager
@@ -288,6 +290,32 @@ reddit stories, aitah, malicious compliance, entitled people, family drama reddi
 🏷️ HASHTAGS:
 {" ".join(tags_list)}
 """
+
+        # 8. Geração da Thumbnail Oficial de Alto CTR (16:9 / 1920x1080)
+        thumb_engine = RedditThumbnailEngine(brand_name="Reddit Minute")
+        thumb_bg = orbital_clips[0] if orbital_clips else None
+        thumb_path = os.path.join(longform_dir, "thumbnail_youtube.png")
+        try:
+            thumb_engine.generate_youtube_thumbnail(
+                story_data={
+                    "title": main_title,
+                    "subreddit": story_raw.get("subreddit", "r/AITAH"),
+                    "author": story_raw.get("author", "throwaway_op"),
+                    "score": story_raw.get("score", "48.2k")
+                },
+                output_path=thumb_path,
+                background_video_path=thumb_bg,
+                shock_hook=longform_data.get("opening_hook")
+            )
+            meta_content += f"""
+---------------------------------------------------
+🖼️ THUMBNAILS OFICIAIS (1920x1080):
+PNG: {thumb_path}
+JPG: {thumb_path.replace('.png', '.jpg')}
+"""
+        except Exception as e:
+            app_logger.warning(f"[Longform30Min] Erro ao gerar thumbnail: {str(e)}")
+
         with open(metadata_path, "w", encoding="utf-8") as f:
             f.write(meta_content)
 
@@ -317,6 +345,7 @@ reddit stories, aitah, malicious compliance, entitled people, family drama reddi
             "longform_dir": longform_dir,
             "output_video": output_master_mp4,
             "srt_file": master_srt_path,
+            "thumbnail_file": thumb_path,
             "metadata_file": metadata_path,
             "total_duration_minutes": round(total_story_duration / 60.0, 2),
             "total_chapters": len(chapter_data),
