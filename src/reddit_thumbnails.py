@@ -15,22 +15,17 @@ except ImportError:
     from reddit_render import find_ffmpeg_binary, get_media_duration
 
 
-def get_thumbnail_font(size: int, bold: bool = False, impact: bool = False) -> ImageFont.FreeTypeFont:
-    """Carrega fontes de alta legibilidade para Thumbnails com fallbacks do sistema."""
-    if impact:
-        candidates = [
-            r"C:\Windows\Fonts\impact.ttf",
-            r"C:\Windows\Fonts\arialbd.ttf",
-            r"C:\Windows\Fonts\segoeuib.ttf"
-        ]
-    elif bold:
-        candidates = [
-            r"C:\Windows\Fonts\segoeuib.ttf",
-            r"C:\Windows\Fonts\arialbd.ttf",
-            r"C:\Windows\Fonts\tahomabd.ttf",
-            r"C:\Windows\Fonts\calibrib.ttf"
-        ]
-    else:
+def get_thumbnail_font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    """Carrega fontes de alta legibilidade para Thumbnails estilo White Card."""
+    candidates = [
+        r"C:\Windows\Fonts\segoeuib.ttf",
+        r"C:\Windows\Fonts\arialbd.ttf",
+        r"C:\Windows\Fonts\tahomabd.ttf",
+        r"C:\Windows\Fonts\calibrib.ttf",
+        r"C:\Windows\Fonts\segoeui.ttf",
+        r"C:\Windows\Fonts\arial.ttf"
+    ]
+    if not bold:
         candidates = [
             r"C:\Windows\Fonts\segoeui.ttf",
             r"C:\Windows\Fonts\arial.ttf",
@@ -46,60 +41,11 @@ def get_thumbnail_font(size: int, bold: bool = False, impact: bool = False) -> I
     return ImageFont.load_default()
 
 
-def extract_shock_phrase(title: str, custom_hook: Optional[str] = None) -> str:
-    """
-    Extrai ou sintetiza uma frase de choque de 1 a 4 palavras para a Thumbnail
-    baseada no conflito central da história (ex: 'SOLD HER CAR!', '$25K WEDDING DEMAND').
-    """
-    if custom_hook and len(custom_hook.strip()) > 0:
-        return custom_hook.upper().strip()
-
-    title_clean = title.strip()
-
-    # Padrões comuns de alta retenção no Reddit
-    if re.search(r"sold\s+(?:her|his|their|the)\s+car", title_clean, re.IGNORECASE):
-        return "SOLD HER CAR!"
-    if re.search(r"\$25[kK]|\$25,000", title_clean):
-        return "$25K WEDDING DEMAND!"
-    if re.search(r"\$18[kK]|\$18,000", title_clean):
-        return "$18,000 DEMAND!"
-    if re.search(r"\$280[kK]|\$280,000", title_clean):
-        return "$280K OUTAGE!"
-    if re.search(r"\$38[kK]|\$38,000", title_clean):
-        return "$38,000 OVERTIME!"
-    if re.search(r"\$34[kK]|\$34,000", title_clean):
-        return "$34,000 DISASTER!"
-    if re.search(r"\$42[kK]|\$42,000", title_clean):
-        return "$42,000 REVENGE!"
-    if re.search(r"\$140[kK]|\$140,000", title_clean):
-        return "$140,000 COST!"
-    if re.search(r"sourdough|starter", title_clean, re.IGNORECASE):
-        return "130-YR HEIRLOOM RUINED!"
-    if re.search(r"overtime", title_clean, re.IGNORECASE):
-        return "MASSIVE OVERTIME REVENGE!"
-    if re.search(r"fired|termination|dismissed", title_clean, re.IGNORECASE):
-        return "FIRED ON THE SPOT!"
-    if re.search(r"wedding", title_clean, re.IGNORECASE):
-        return "WEDDING DRAMA EXPLODES!"
-    if re.search(r"landlord|deposit", title_clean, re.IGNORECASE):
-        return "LANDLORD GOT REVENGE!"
-    if re.search(r"malicious\s+compliance", title_clean, re.IGNORECASE):
-        return "MALICIOUS COMPLIANCE!"
-    if re.search(r"aitah|aita", title_clean, re.IGNORECASE):
-        return "WHO IS IN THE WRONG?"
-
-    # Fallback genérico: primeiras 3-4 palavras de impacto
-    words = title_clean.split()
-    if len(words) >= 3:
-        candidate = " ".join(words[:4]).upper()
-        return candidate.rstrip(".,!?:;") + "!"
-    return "INSANE REDDIT STORY!"
-
-
 class RedditThumbnailEngine:
     """
     Motor Gráfico Especializado em Thumbnails 16:9 (1920x1080) para YouTube
-    seguindo as diretrizes de alto CTR e branding do canal 'Reddit Minute'.
+    seguindo o padrão visual dos canais líderes (@Mini Mystie, @Bountywishes, @QuokkaReads).
+    Design: White Card com Borda Laranja #FF4500, Avatar + Selo Azul + Awards + Texto Ultra-Bold Preto.
     """
 
     def __init__(self, brand_name: str = "Reddit Minute"):
@@ -107,13 +53,13 @@ class RedditThumbnailEngine:
         self.ffmpeg_bin = find_ffmpeg_binary()
 
     def _extract_backdrop_frame(self, video_path: Optional[str], output_frame_path: str) -> bool:
-        """Extrai um frame estático em HD do vídeo de fundo de gameplay."""
+        """Extrai um frame estático colorido em HD do vídeo de fundo de gameplay."""
         if not video_path or not os.path.exists(video_path):
             return False
 
         try:
             dur = get_media_duration(video_path, self.ffmpeg_bin)
-            seek_pos = min(30.0, max(5.0, dur * 0.2)) if dur > 10 else 1.0
+            seek_pos = min(45.0, max(5.0, dur * 0.25)) if dur > 10 else 1.0
 
             cmd = [
                 self.ffmpeg_bin, "-y",
@@ -130,17 +76,73 @@ class RedditThumbnailEngine:
             return False
 
     def _create_procedural_background(self, width: int = 1920, height: int = 1080) -> Image.Image:
-        """Cria um fundo degradê cinematográfico escuro em caso de ausência de vídeo."""
-        img = Image.new("RGB", (width, height), (15, 18, 26))
+        """Cria um fundo degradê vivo e vibrante inspirado em paisagem Minecraft/Cherry Blossom."""
+        img = Image.new("RGB", (width, height), (255, 180, 190))
         draw = ImageDraw.Draw(img)
-        # Gradiente radial sutil escurecendo para as bordas
+        # Gradiente suave do céu azul claro para verde/rosa cerejeira
         for y in range(height):
             ratio = y / height
-            r = int(22 - ratio * 12)
-            g = int(26 - ratio * 14)
-            b = int(38 - ratio * 20)
-            draw.line([(0, y), (width, y)], fill=(max(5, r), max(8, g), max(12, b)))
+            r = int(140 + ratio * 80)
+            g = int(185 + (1 - ratio) * 50)
+            b = int(240 - ratio * 60)
+            draw.line([(0, y), (width, y)], fill=(min(255, r), min(255, g), min(255, b)))
         return img
+
+    def _draw_verified_badge(self, draw: ImageDraw.ImageDraw, x: int, y: int, size: int = 28):
+        """Desenha o selo de verificado azul com checkmark branco."""
+        draw.ellipse([x, y, x + size, y + size], fill=(29, 155, 240, 255)) # Twitter/YouTube Blue #1D9BF0
+        # Checkmark branco
+        cx, cy = x + size // 2, y + size // 2
+        p1 = (cx - 6, cy)
+        p2 = (cx - 2, cy + 5)
+        p3 = (cx + 6, cy - 5)
+        draw.line([p1, p2, p3], fill=(255, 255, 255, 255), width=3)
+
+    def _draw_reddit_awards_row(self, draw: ImageDraw.ImageDraw, start_x: int, start_y: int):
+        """Desenha a faixa de condecorações/awards coloridas do Reddit."""
+        awards = [
+            {"bg": (255, 110, 160), "symbol": "💖"}, # Wholesome Heart
+            {"bg": (255, 195, 0),   "symbol": "🏆"}, # Gold Trophy
+            {"bg": (0, 210, 255),   "symbol": "💎"}, # Platinum Diamond
+            {"bg": (255, 140, 0),   "symbol": "🎁"}, # Present Award
+            {"bg": (255, 90, 95),   "symbol": "🎂"}, # Cake Day
+            {"bg": (120, 220, 100), "symbol": "🌟"}, # Star Award
+            {"bg": (180, 130, 255), "symbol": "⚡"}  # Energy Spark
+        ]
+
+        radius = 14
+        spacing = 34
+        for idx, aw in enumerate(awards):
+            ax = start_x + (idx * spacing)
+            ay = start_y
+            # Círculo base do award
+            draw.ellipse([ax - radius, ay - radius, ax + radius, ay + radius], fill=aw["bg"] + (240,), outline=(255, 255, 255, 220), width=1)
+            # Ponto central brilhante
+            draw.ellipse([ax - 4, ay - 4, ax + 4, ay + 4], fill=(255, 255, 255, 255))
+
+    def _get_channel_avatar(self, size: int = 80) -> Image.Image:
+        """Carrega ou gera o avatar circular do canal Reddit Minute."""
+        avatar = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        avatar_draw = ImageDraw.Draw(avatar)
+
+        # Base circular Laranja Reddit (#FF4500)
+        avatar_draw.ellipse([0, 0, size, size], fill=(255, 69, 0, 255))
+
+        # Desenho do Snoo / Alien estilizado
+        cx, cy = size // 2, size // 2
+        # Cabeça branca
+        avatar_draw.ellipse([cx - 24, cy - 16, cx + 24, cy + 20], fill=(255, 255, 255, 255))
+        # Orelhas
+        avatar_draw.ellipse([cx - 30, cy - 10, cx - 20, cy], fill=(255, 255, 255, 255))
+        avatar_draw.ellipse([cx + 20, cy - 10, cx + 30, cy], fill=(255, 255, 255, 255))
+        # Olhos laranjas
+        avatar_draw.ellipse([cx - 14, cy - 6, cx - 6, cy + 4], fill=(255, 69, 0, 255))
+        avatar_draw.ellipse([cx + 6, cy - 6, cx + 14, cy + 4], fill=(255, 69, 0, 255))
+        # Antena
+        avatar_draw.line([(cx, cy - 16), (cx + 8, cy - 28), (cx + 16, cy - 26)], fill=(255, 255, 255, 255), width=3)
+        avatar_draw.ellipse([cx + 14, cy - 30, cx + 22, cy - 22], fill=(255, 255, 255, 255))
+
+        return avatar
 
     def generate_youtube_thumbnail(
         self,
@@ -150,25 +152,26 @@ class RedditThumbnailEngine:
         shock_hook: Optional[str] = None
     ) -> str:
         """
-        Renderiza uma miniatura completa de 1920x1080 (16:9) em formato PNG e JPG.
+        Renderiza uma miniatura completa de 1920x1080 (16:9) no formato White Card Premium.
         """
         with LogSpan("generate_youtube_thumbnail", extra={"title": story_data.get("title", "")[:30]}):
             canvas_w, canvas_h = 1920, 1080
             temp_frame = output_path + ".tmp_frame.jpg"
 
-            # 1. Preparação do Background
+            # 1. Preparação do Background de Minecraft (Saturado e Vivo)
             bg_success = self._extract_backdrop_frame(background_video_path, temp_frame)
             if bg_success and os.path.exists(temp_frame):
                 try:
                     bg_img = Image.open(temp_frame).convert("RGBA")
                     bg_img = bg_img.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
-                    # Desfoque cinematográfico suave para realçar o primeiro plano
-                    bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=6))
-                    # Ajuste de contraste e brilho escurecido (-25% brilho para legibilidade)
-                    enhancer = ImageEnhance.Brightness(bg_img)
-                    bg_img = enhancer.enhance(0.72)
+                    # Desfoque suave de profundidade de campo
+                    bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=5))
+                    # Saturação vívida
                     enhancer_sat = ImageEnhance.Color(bg_img)
-                    bg_img = enhancer_sat.enhance(1.15)
+                    bg_img = enhancer_sat.enhance(1.25)
+                    # Brilho agradável (não escuro, bem iluminado)
+                    enhancer_br = ImageEnhance.Brightness(bg_img)
+                    bg_img = enhancer_br.enhance(0.95)
                 except Exception:
                     bg_img = self._create_procedural_background(canvas_w, canvas_h).convert("RGBA")
                 finally:
@@ -180,194 +183,116 @@ class RedditThumbnailEngine:
             else:
                 bg_img = self._create_procedural_background(canvas_w, canvas_h).convert("RGBA")
 
-            # Aplicação de Vinheta Escura nas Bordas
-            vignette = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-            v_draw = ImageDraw.Draw(vignette)
-            v_draw.rectangle([0, 0, canvas_w, canvas_h], fill=(0, 0, 0, 100))
-            # Gradiente escuro no rodapé e topo
-            for y in range(220):
-                alpha = int(180 * (1 - y / 220))
-                v_draw.line([(0, y), (canvas_w, y)], fill=(0, 0, 0, alpha))
-            for y in range(canvas_h - 260, canvas_h):
-                alpha = int(210 * ((y - (canvas_h - 260)) / 260))
-                v_draw.line([(0, y), (canvas_w, y)], fill=(0, 0, 0, alpha))
+            # 2. Estrutura e Dimensões do White Card Central
+            # O card ocupa a maior parte da tela de forma imponente e centralizada
+            card_w = 1680
+            card_h = 880
+            card_x = (canvas_w - card_w) // 2  # 120px
+            card_y = (canvas_h - card_h) // 2  # 100px
 
-            bg_img = Image.alpha_composite(bg_img, vignette)
-
-            # Criação da Camada de Desenho Principal
-            overlay = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(overlay)
-
-            # Dados do Post
-            subreddit = story_data.get("subreddit", "r/AITAH")
-            if not subreddit.startswith("r/"):
-                subreddit = f"r/{subreddit}"
-            author = story_data.get("author", "throwaway_reddit")
-            if not author.startswith("u/"):
-                author = f"u/{author}"
-            score = story_data.get("score", "48.2k")
-            if isinstance(score, (int, float)):
-                score = f"{score/1000:.1f}k" if score >= 1000 else str(score)
-
-            title_text = (story_data.get("display_title") or story_data.get("title") or "She Demanded My House Savings, So I Sold Her Car").strip()
-
-            # 2. TOPO: Branding do Canal "Reddit Minute" & Badges
-            # Badge Esquerdo: Reddit Minute
-            brand_pill_x, brand_pill_y = 60, 50
-            brand_pill_w, brand_pill_h = 320, 64
-            draw.rounded_rectangle(
-                [brand_pill_x, brand_pill_y, brand_pill_x + brand_pill_w, brand_pill_y + brand_pill_h],
-                radius=18,
-                fill=(255, 69, 0, 240), # Reddit Orange #FF4500
-                outline=(255, 255, 255, 200),
-                width=2
-            )
-            # Ícone Reddit (círculo branco simples com olhos laranjas)
-            ico_cx, ico_cy = brand_pill_x + 32, brand_pill_y + 32
-            draw.ellipse([ico_cx - 16, ico_cy - 16, ico_cx + 16, ico_cy + 16], fill=(255, 255, 255, 255))
-            draw.ellipse([ico_cx - 8, ico_cy - 5, ico_cx - 3, ico_cy], fill=(255, 69, 0, 255))
-            draw.ellipse([ico_cx + 3, ico_cy - 5, ico_cx + 8, ico_cy], fill=(255, 69, 0, 255))
-
-            font_brand = get_thumbnail_font(28, bold=True)
-            draw.text((brand_pill_x + 60, brand_pill_y + 14), self.brand_name.upper(), font=font_brand, fill=(255, 255, 255, 255))
-
-            # Badge Central: Subreddit
-            sub_pill_x = brand_pill_x + brand_pill_w + 20
-            sub_pill_w = 260
-            draw.rounded_rectangle(
-                [sub_pill_x, brand_pill_y, sub_pill_x + sub_pill_w, brand_pill_y + brand_pill_h],
-                radius=18,
-                fill=(0, 121, 211, 230), # Reddit Blue #0079D3
-                outline=(255, 255, 255, 180),
-                width=2
-            )
-            draw.text((sub_pill_x + 24, brand_pill_y + 14), subreddit, font=font_brand, fill=(255, 255, 255, 255))
-
-            # Badge Direito: "30+ MIN FULL STORY"
-            tag_pill_x = canvas_w - 380
-            tag_pill_w = 320
-            draw.rounded_rectangle(
-                [tag_pill_x, brand_pill_y, tag_pill_x + tag_pill_w, brand_pill_y + brand_pill_h],
-                radius=18,
-                fill=(18, 20, 28, 240),
-                outline=(255, 230, 0, 255), # Amarelo Destaque
-                width=3
-            )
-            font_tag = get_thumbnail_font(26, bold=True)
-            draw.text((tag_pill_x + 22, brand_pill_y + 16), "⏱️ 30+ MIN FULL STORY", font=font_tag, fill=(255, 230, 0, 255))
-
-            # 3. CARD CENTRAL OFICIAL DO REDDIT (Dark Mode #1A1A1B)
-            card_x = 60
-            card_y = 150
-            card_w = 1800
-            card_h = 420
-
-            # Sombra 3D profunda atrás do Card
-            shadow_box = [card_x - 12, card_y + 12, card_x + card_w + 12, card_y + card_h + 24]
+            # Camada de sombra 3D suave flutuante
             shadow_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
             s_draw = ImageDraw.Draw(shadow_layer)
-            s_draw.rounded_rectangle(shadow_box, radius=36, fill=(0, 0, 0, 235))
-            shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(24))
-            overlay = Image.alpha_composite(shadow_layer, overlay)
-            draw = ImageDraw.Draw(overlay)
+            shadow_box = [card_x - 10, card_y + 16, card_x + card_w + 10, card_y + card_h + 36]
+            s_draw.rounded_rectangle(shadow_box, radius=48, fill=(0, 0, 0, 100))
+            shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(32))
 
-            # Corpo do Card
-            draw.rounded_rectangle(
-                [card_x, card_y, card_x + card_w, card_y + card_h],
-                radius=28,
-                fill=(26, 26, 27, 245), # Dark Mode Reddit #1A1A1B
-                outline=(52, 53, 54, 255), # Borda sutil
-                width=3
-            )
+            # Combina a sombra sobre o fundo
+            composite_img = Image.alpha_composite(bg_img, shadow_layer)
 
-            # Cabeçalho do Card
-            header_y = card_y + 36
-            # Ícone Subreddit
-            draw.ellipse([card_x + 40, header_y, card_x + 40 + 48, header_y + 48], fill=(255, 69, 0, 255))
-            draw.text((card_x + 40 + 16, header_y + 10), "r/", font=get_thumbnail_font(24, bold=True), fill=(255, 255, 255, 255))
+            # Camada de desenho do Card
+            card_layer = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(card_layer)
 
-            font_meta_bold = get_thumbnail_font(28, bold=True)
-            font_meta_gray = get_thumbnail_font(26, bold=False)
+            # Desenho do Card Branco Puro com Borda Laranja Reddit (#FF4500)
+            card_rect = [card_x, card_y, card_x + card_w, card_y + card_h]
+            # Fundo branco puro
+            draw.rounded_rectangle(card_rect, radius=42, fill=(255, 255, 255, 255))
+            # Borda Laranja de 10px
+            border_width = 10
+            draw.rounded_rectangle(card_rect, radius=42, outline=(255, 69, 0, 255), width=border_width)
 
-            draw.text((card_x + 104, header_y + 8), subreddit, font=font_meta_bold, fill=(255, 255, 255, 255))
-            draw.text((card_x + 104 + len(subreddit) * 16 + 15, header_y + 10), f"• Posted by {author} • 4h ago", font=font_meta_gray, fill=(129, 131, 132, 255))
+            # 3. Cabeçalho do Card: Avatar + @Canal + Selo Verificado + Awards
+            header_y = card_y + 44
 
-            # Upvotes Pill (Direita do Header do Card)
-            upvote_x = card_x + card_w - 240
-            draw.rounded_rectangle(
-                [upvote_x, header_y - 4, upvote_x + 200, header_y + 52],
-                radius=20,
-                fill=(39, 39, 41, 255),
-                outline=(52, 53, 54, 255),
-                width=2
-            )
-            font_upvote = get_thumbnail_font(26, bold=True)
-            draw.text((upvote_x + 20, header_y + 8), f"▲  {score}", font=font_upvote, fill=(255, 69, 0, 255))
+            # Avatar Circular
+            avatar_img = self._get_channel_avatar(size=76)
+            card_layer.paste(avatar_img, (card_x + 52, header_y), avatar_img)
 
-            # Título do Post no Card (Quebra inteligente de até 3 linhas)
-            font_title = get_thumbnail_font(44, bold=True)
-            title_lines = textwrap.wrap(title_text, width=64)
-            if len(title_lines) > 3:
-                title_lines = title_lines[:3]
+            # Aro externo de destaque no avatar
+            draw.ellipse([card_x + 50, header_y - 2, card_x + 50 + 80, header_y + 78], outline=(255, 69, 0, 255), width=3)
+
+            # Nome do Canal: @Reddit Minute (ou Bountywishes/Mini Mystie)
+            channel_label = f"@{self.brand_name.replace(' ', '')}"
+            font_channel = get_thumbnail_font(34, bold=True)
+            name_x = card_x + 144
+            name_y = header_y + 4
+            draw.text((name_x, name_y), channel_label, font=font_channel, fill=(15, 20, 25, 255))
+
+            # Selo de Verificado Azul
+            # Mede largura do nome
+            bbox_name = font_channel.getbbox(channel_label)
+            name_w = bbox_name[2] - bbox_name[0]
+            badge_x = name_x + name_w + 12
+            badge_y = name_y + 5
+            self._draw_verified_badge(draw, badge_x, badge_y, size=28)
+
+            # Faixa de Condecorações (Reddit Awards)
+            awards_x = name_x
+            awards_y = name_y + 42
+            self._draw_reddit_awards_row(draw, awards_x + 16, awards_y + 10)
+
+            # 4. Texto Principal da História (Headline Ultra-Bold)
+            title_text = (story_data.get("display_title") or story_data.get("title") or "She Demanded My $25K House Savings For Her Wedding, So I Sold Her Car").strip()
+
+            # Normalização de aspas
+            title_text = title_text.replace('"', "'").replace('“', "'").replace('”', "'")
+
+            # Quebra de texto com cálculo de tamanho de fonte responsivo
+            max_chars_per_line = 44
+            if len(title_text) > 130:
+                font_size = 52
+                max_chars_per_line = 48
+            elif len(title_text) > 85:
+                font_size = 58
+                max_chars_per_line = 44
+            else:
+                font_size = 64
+                max_chars_per_line = 38
+
+            font_title = get_thumbnail_font(font_size, bold=True)
+            title_lines = textwrap.wrap(title_text, width=max_chars_per_line)
+            if len(title_lines) > 5:
+                title_lines = title_lines[:5]
                 if not title_lines[-1].endswith("..."):
                     title_lines[-1] = title_lines[-1].rstrip(".!? ") + "..."
 
-            title_y_start = header_y + 74
+            # Cálculo de posicionamento vertical para centralização perfeita no espaço restante
+            line_height = int(font_size * 1.32)
+            total_text_h = len(title_lines) * line_height
+
+            available_content_top = header_y + 90
+            available_content_bottom = card_y + card_h - 40
+            available_content_h = available_content_bottom - available_content_top
+
+            text_start_y = available_content_top + max(20, (available_content_h - total_text_h) // 2)
+            text_x = card_x + 64
+
+            # Desenha as linhas do texto em Preto Profundo (#0F1419)
             for l_idx, line in enumerate(title_lines):
-                draw.text((card_x + 44, title_y_start + (l_idx * 58)), line, font=font_title, fill=(255, 255, 255, 255))
+                cur_y = text_start_y + (l_idx * line_height)
+                draw.text((text_x, cur_y), line, font=font_title, fill=(15, 20, 25, 255))
 
-            # 4. 🔥 TEXTO DE CHOQUE / ALTO CTR (Impact Banner)
-            shock_text = extract_shock_phrase(title_text, shock_hook)
-            font_shock = get_thumbnail_font(78, bold=True, impact=True)
+            # Composição final
+            final_img = Image.alpha_composite(composite_img, card_layer).convert("RGB")
 
-            shock_y = card_y + card_h + 60
-            shock_x = 60
-
-            # Renderiza Tarja / Destaque de Fundo para o Texto de Choque
-            # Medição aproximada do texto
-            bbox = font_shock.getbbox(shock_text)
-            text_w = bbox[2] - bbox[0]
-            text_h = bbox[3] - bbox[1]
-
-            # Fundo preto translúcido atrás do texto de choque para máximo contraste
-            pad_x, pad_y = 30, 20
-            draw.rounded_rectangle(
-                [shock_x - pad_x, shock_y - pad_y, shock_x + text_w + pad_x, shock_y + text_h + pad_y + 10],
-                radius=24,
-                fill=(0, 0, 0, 230),
-                outline=(255, 230, 0, 255),
-                width=4
-            )
-
-            # Texto com contorno (Stroke de 10px) em amarelo vibrante
-            stroke_width = 8
-            for sx in range(-stroke_width, stroke_width + 1):
-                for sy in range(-stroke_width, stroke_width + 1):
-                    if sx * sx + sy * sy <= stroke_width * stroke_width:
-                        draw.text((shock_x + sx, shock_y + sy), shock_text, font=font_shock, fill=(0, 0, 0, 255))
-
-            # Texto em Amarelo Destaque (#FFE600)
-            draw.text((shock_x, shock_y), shock_text, font=font_shock, fill=(255, 230, 0, 255))
-
-            # Sub-gancho secundário: "FULL NARRATION & REVENGE"
-            font_sub_shock = get_thumbnail_font(34, bold=True)
-            draw.text((shock_x, shock_y + text_h + 46), "🔥 COMPLETE SAGA • INSTANT KARMA", font=font_sub_shock, fill=(255, 255, 255, 230))
-
-            # 5. PROTEÇÃO DA SAFE-AREA DO YOUTUBE (Canto Inferior Direito)
-            # O canto x: 1640-1920, y: 960-1080 é reservado para a tarja do YouTube
-            # Adiciona sutil vinheta para garantir contraste
-            draw.rectangle([canvas_w - 280, canvas_h - 120, canvas_w, canvas_h], fill=(0, 0, 0, 90))
-
-            # Composição Final
-            final_img = Image.alpha_composite(bg_img, overlay).convert("RGB")
-
-            # Salva versões em PNG e JPG
+            # 5. Salva versões em PNG e JPG
             os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
             png_path = output_path if output_path.endswith(".png") else output_path + ".png"
             jpg_path = output_path.replace(".png", ".jpg") if output_path.endswith(".png") else output_path + ".jpg"
 
             final_img.save(png_path, format="PNG")
-            final_img.save(jpg_path, format="JPEG", quality=95, optimize=True)
+            final_img.save(jpg_path, format="JPEG", quality=96, optimize=True)
 
-            app_logger.info(f"[Thumbnail] Miniatura gerada com sucesso: {png_path} & {jpg_path} (1920x1080)")
+            app_logger.info(f"[Thumbnail] Miniatura White Card gerada com sucesso: {png_path} & {jpg_path} (1920x1080)")
             return png_path
