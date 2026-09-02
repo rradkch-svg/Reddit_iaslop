@@ -159,7 +159,11 @@ def get_rate_limiter_for_key(api_key: str, max_rpm: int = 14) -> GeminiRateLimit
 
 def get_prioritized_keys(keys: List[str]) -> List[str]:
     now = time.time()
-    return sorted(keys, key=lambda k: _KEY_COOLDOWNS.get(k, 0.0) > now)
+    valid_keys = [k for k in keys if _KEY_COOLDOWNS.get(k, 0.0) <= now]
+    if valid_keys:
+        return valid_keys
+    # Se todas as chaves estiverem em cooldown, ordena pela que expira mais cedo
+    return sorted(keys, key=lambda k: _KEY_COOLDOWNS.get(k, 0.0))
 
 def extract_retry_seconds(error_str: str) -> int:
     match = re.search(r"retry in (\d+(\.\d+)?)s", str(error_str), re.IGNORECASE)
@@ -265,6 +269,13 @@ def generate_with_resilience(
                     is_unavailable = "503" in err_text or "UNAVAILABLE" in err_text or "high demand" in err_text.lower() or "overloaded" in err_text.lower() or "500" in err_text or "502" in err_text
                     is_timeout = "DeadlineExceeded" in type(e).__name__ or "DEADLINE_EXCEEDED" in err_text or "timeout" in err_text.lower() or "504" in err_text
                     
+                    is_auth_error = "403" in err_text or "PERMISSION_DENIED" in err_text or "API_KEY_INVALID" in err_text or "UNAUTHENTICATED" in err_text or "dunning" in err_text.lower()
+                    
+                    if is_auth_error:
+                        _KEY_COOLDOWNS[current_key] = time.time() + 86400 * 7
+                        app_logger.warning(f"[Gemini API] Chave {key_display} com permissão negada / dunning (403 PERMISSION_DENIED). Isolando chave e tentando próxima...")
+                        continue
+
                     if is_timeout:
                         app_logger.warning(f"[Gemini API] Timeout (> {timeout_seconds}s) no modelo {current_model} (chave {key_display}). Tentando próxima chave...")
                         continue
