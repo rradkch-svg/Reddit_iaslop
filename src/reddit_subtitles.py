@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 from typing import List, Dict, Any
 
@@ -16,6 +16,16 @@ def format_ass_time(seconds: float) -> str:
     if cs >= 100:
         cs = 99
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+def format_srt_time(seconds: float) -> str:
+    """Converte segundos para formato SRT padrão SubRip (HH:MM:SS,mmm)"""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    ms = int(round((seconds - int(seconds)) * 1000))
+    if ms >= 1000:
+        ms = 999
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 def hex_to_ass(hex_code: str) -> str:
     """Converte RRGGBB para BBGGRR (formato de cor do ASS)"""
@@ -109,3 +119,51 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         except Exception as e:
             app_logger.error(f"[Subtitles] Erro ao gravar arquivo ASS: {str(e)}")
             return False
+
+def generate_reddit_srt_subtitles(
+    words_timing: List[Dict[str, Any]],
+    output_srt: str,
+    time_offset_sec: float = 0.0,
+    chunk_size: int = 6,
+    append: bool = False,
+    start_index: int = 1
+) -> int:
+    """
+    Gera arquivo de legendas no formato SubRip (.srt) agrupadas em frases curtas e legíveis,
+    ideais para upload direto no YouTube Studio e indexação imediata de SEO/palavras-chave.
+    Retorna o próximo índice numérico para encadeamento de múltiplos capítulos.
+    """
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(output_srt)), exist_ok=True)
+        mode = "a" if append else "w"
+        current_idx = start_index
+
+        with open(output_srt, mode, encoding="utf-8") as f:
+            if not words_timing:
+                if not append:
+                    f.write(f"1\n00:00:00,000 --> 00:00:05,000\nReddit Story\n\n")
+                return current_idx + 1
+
+            for i in range(0, len(words_timing), chunk_size):
+                chunk = words_timing[i:i + chunk_size]
+                if not chunk:
+                    continue
+
+                words_text = [str(w.get("word", "")).strip() for w in chunk if str(w.get("word", "")).strip()]
+                if not words_text:
+                    continue
+
+                start_sec = time_offset_sec + chunk[0].get("start", 0.0)
+                end_sec = time_offset_sec + chunk[-1].get("end", start_sec + 0.5)
+
+                start_str = format_srt_time(start_sec)
+                end_str = format_srt_time(end_sec)
+                phrase = " ".join(words_text)
+
+                f.write(f"{current_idx}\n{start_str} --> {end_str}\n{phrase}\n\n")
+                current_idx += 1
+
+        return current_idx
+    except Exception as e:
+        app_logger.error(f"[Subtitles] Erro ao gravar arquivo SRT: {str(e)}")
+        return start_index

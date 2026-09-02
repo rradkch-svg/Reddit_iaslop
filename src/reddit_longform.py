@@ -12,7 +12,7 @@ try:
     from .reddit_agents import RedditStoryDirectorAgent, PERSONA_VOICE_MAP
     from .reddit_audio import RedditAudioEngine
     from .reddit_visuals import RedditVisualEngine
-    from .reddit_subtitles import generate_reddit_ass_subtitles
+    from .reddit_subtitles import generate_reddit_ass_subtitles, generate_reddit_srt_subtitles
     from .reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from .batch_manager import BatchManager
     from .checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
@@ -22,7 +22,7 @@ except ImportError:
     from reddit_agents import RedditStoryDirectorAgent, PERSONA_VOICE_MAP
     from reddit_audio import RedditAudioEngine
     from reddit_visuals import RedditVisualEngine
-    from reddit_subtitles import generate_reddit_ass_subtitles
+    from reddit_subtitles import generate_reddit_ass_subtitles, generate_reddit_srt_subtitles
     from reddit_render import render_reddit_story_video, find_ffmpeg_binary, get_media_duration, get_orbital_backgrounds
     from batch_manager import BatchManager
     from checkpoint_manager import DEFAULT_CHECKPOINT_MANAGER
@@ -115,6 +115,8 @@ def generate_30min_single_story_video(
         chapter_video_files = []
         chapter_audio_files = []
         accumulated_time = 0.0
+        master_srt_path = os.path.join(longform_dir, "longform_master_30min.srt")
+        srt_next_idx = 1
 
         # 4. Renderizar cada capítulo da história única (Modular Chunking)
         for idx, ch in enumerate(chapters):
@@ -123,7 +125,7 @@ def generate_30min_single_story_video(
             ch_narration = ch.get("narration_text", "")
 
             if status_callback:
-                status_callback(f"🎙️ Gravando Áudio e Card da Parte {ch_num}/8: {ch_title}...")
+                status_callback(f"🎙️ Gravando Áudio e Card da Parte {ch_num}/{len(chapters)}: {ch_title}...")
 
             # Áudio do capítulo
             seg_audio_path = os.path.join(chunks_dir, f"audio_part_{ch_num:02d}.mp3")
@@ -147,16 +149,26 @@ def generate_30min_single_story_video(
                 }
                 visual_engine.render_reddit_card(card_info, card_png, aspect_ratio=aspect_ratio)
 
-            # Legendas dinâmicas ASS
+            # Legendas dinâmicas ASS por chunk
             ass_path = os.path.join(chunks_dir, f"subtitles_part_{ch_num:02d}.ass")
             generate_reddit_ass_subtitles(words_timing, ass_path, aspect_ratio=aspect_ratio)
+
+            # Legendas SRT consolidadas para upload direto no YouTube Studio
+            srt_next_idx = generate_reddit_srt_subtitles(
+                words_timing=words_timing,
+                output_srt=master_srt_path,
+                time_offset_sec=accumulated_time,
+                chunk_size=6,
+                append=(idx > 0),
+                start_index=srt_next_idx
+            )
 
             # Seleciona clipe de fundo alternado
             bg_clip = orbital_clips[idx % len(orbital_clips)] if orbital_clips else None
             ch_video_output = os.path.join(chunks_dir, f"part_{ch_num:02d}.mp4")
 
             if status_callback:
-                status_callback(f"🎬 Renderizando chunk da Parte {ch_num}/8 ({seg_dur:.0f}s)...")
+                status_callback(f"🎬 Renderizando chunk da Parte {ch_num}/{len(chapters)} ({seg_dur:.0f}s)...")
 
             ok, out_path = render_reddit_story_video(
                 audio_path=seg_audio_path,
@@ -228,7 +240,7 @@ def generate_30min_single_story_video(
         except Exception:
             pass
 
-        # 7. Metadados e Timestamps do YouTube para a História Única
+        # 7. Metadados, Timestamps, Comentário Fixado e Post de Comunidade do YouTube
         timestamps_lines = []
         for ch in chapter_data:
             sec = int(ch["start_time_sec"])
@@ -239,23 +251,42 @@ def generate_30min_single_story_video(
 
         timestamps_block = "\n".join(timestamps_lines)
         metadata_path = os.path.join(longform_dir, "metadata_youtube.txt")
-        meta_content = f"""TÍTULO DO VÍDEO (ALTO CPM):
-{longform_data.get('main_title', story_raw.get('title', ''))}
+        main_title = longform_data.get('main_title', story_raw.get('title', ''))
+        tags_list = longform_data.get('tags', ['#RedditStories', '#MaliciousCompliance', '#30MinStory', '#Longform', '#AITAH', '#FamilyDrama'])
 
-DESCRIÇÃO COMPLETA:
+        meta_content = f"""===================================================
+🎬 REDDIT MINUTE — YOUTUBE UPLOAD PACK (30+ MIN)
+===================================================
+
+📌 TÍTULO DO VÍDEO (ALTO CTR / BUSCA & SUGERIDOS):
+{main_title}
+
+📝 DESCRIÇÃO COMPLETA (COM CAPÍTULOS):
 {longform_data.get('youtube_description', '')}
+
+🔔 Subscribe to Reddit Minute for authentic, daily Reddit stories and family drama!
 
 ⏱️ TIMESTAMPS & CAPÍTULOS DA HISTÓRIA:
 {timestamps_block}
 
 ---------------------------------------------------
-🎮 Background Gameplay: Minecraft Parkour 1080p 60fps (No Copyright Gameplay)
+🎮 Background Gameplay: Minecraft Parkour 1080p 60fps (No Copyright / Free to Use)
 🎙️ Narração Neural: Persona {persona} ({voice_name}) via Reddit Story Studio
 Subreddit Original: {story_raw.get('subreddit')}
 Autor Original: {story_raw.get('author')}
 
-HASHTAGS:
-{" ".join(longform_data.get('tags', ['#RedditStories', '#MaliciousCompliance', '#30MinStory', '#Longform']))}
+💬 COMENTÁRIO FIXADO (PINNED COMMENT CTA — FIXE ASSIM QUE PUBLICAR):
+👇 MORAL VERDICT: Was OP 100% justified, or did they cross the line? Drop your thoughts in the comments—I'll be replying to the top theories!
+
+📢 POST DA ABA COMUNIDADE (COMMUNITY TAB POST):
+🚨 NEW 30-MIN STORY: "{main_title}" is live on the channel!
+Whose side are you on? Watch the full saga now: [LINK DO VÍDEO]
+
+🏷️ TAGS RECOMENDADAS PARA O YOUTUBE STUDIO:
+reddit stories, aitah, malicious compliance, entitled people, family drama reddit, reddit longform, 30 min reddit stories, askreddit, reddit storytime, mark narrations, rslash
+
+🏷️ HASHTAGS:
+{" ".join(tags_list)}
 """
         with open(metadata_path, "w", encoding="utf-8") as f:
             f.write(meta_content)
@@ -285,6 +316,7 @@ HASHTAGS:
             "work_dir": work_dir,
             "longform_dir": longform_dir,
             "output_video": output_master_mp4,
+            "srt_file": master_srt_path,
             "metadata_file": metadata_path,
             "total_duration_minutes": round(total_story_duration / 60.0, 2),
             "total_chapters": len(chapter_data),
