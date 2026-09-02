@@ -26,9 +26,8 @@ class TestRedditThumbnailEngine(unittest.TestCase):
             # Verifica dimensões exatas 1920x1080 (16:9)
             with Image.open(res_path) as img:
                 self.assertEqual(img.size, (1920, 1080))
-                # Verifica que o centro do card é branco (alta luminosidade)
-                # Ponto central do card: (960, 540)
-                pixel = img.getpixel((960, 540))
+                # Verifica que o fundo do card é branco (ponto na margem interna do card)
+                pixel = img.getpixel((250, 400))
                 self.assertGreater(pixel[0], 230)
                 self.assertGreater(pixel[1], 230)
                 self.assertGreater(pixel[2], 230)
