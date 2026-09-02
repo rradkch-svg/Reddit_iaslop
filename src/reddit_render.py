@@ -41,59 +41,50 @@ def get_media_duration(file_path: str, ffmpeg_bin: Optional[str] = None) -> floa
         pass
     return 45.0
 
+def is_valid_video_file(file_path: str, min_size_mb: float = 1.0) -> bool:
+    """Verifica se o arquivo de vídeo existe e possui tamanho mínimo válido."""
+    try:
+        return os.path.exists(file_path) and os.path.getsize(file_path) >= (min_size_mb * 1024 * 1024)
+    except Exception:
+        return False
+
 def get_best_orbital_background(aspect_ratio: str = "9:16") -> Optional[str]:
-    """Localiza o melhor vídeo de gameplay (priorizando Minecraft) em assets/backgrounds."""
-    is_vertical = (aspect_ratio == "9:16")
-    bg_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "backgrounds")
-    
-    candidates = []
-    for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
-        fn = os.path.basename(f).lower()
-        if is_vertical:
-            if "vertical" in fn or "p9xlr1bobyw" in fn or "lkx3805bia8" in fn or "xlze_oo4wqs" in fn:
-                # Prioritize Minecraft parkour first
-                score = 2 if "minecraft" in fn else 1
-                candidates.append((score, f))
-        else:
-            if "horizontal" in fn or "u7ieztmf" in fn or "erilpuq5yms" in fn or "64dw7xvh" in fn:
-                score = 2 if "minecraft" in fn else 1
-                candidates.append((score, f))
-
-    if not candidates:
-        for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
-            fn = os.path.basename(f).lower()
-            score = 2 if "minecraft" in fn else 1
-            candidates.append((score, f))
-
-    if not candidates:
-        return None
-
-    # Sort by highest score first (Minecraft gameplay first)
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    return candidates[0][1]
+    """Localiza o melhor vídeo de gameplay saudável (priorizando Minecraft) em assets/backgrounds."""
+    bgs = get_orbital_backgrounds(aspect_ratio=aspect_ratio)
+    return bgs[0] if bgs else None
 
 def get_orbital_backgrounds(aspect_ratio: str = "16:9") -> List[str]:
-    """Retorna lista de vídeos de gameplay disponíveis em assets/backgrounds com Minecraft priorizado."""
+    """Retorna lista de vídeos de gameplay válidos em assets/backgrounds com Minecraft priorizado."""
     is_vertical = (aspect_ratio == "9:16")
     bg_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "backgrounds")
     
     candidates = []
     for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
+        if not is_valid_video_file(f, min_size_mb=2.0):
+            continue
         fn = os.path.basename(f).lower()
         if is_vertical:
             if "vertical" in fn or "p9xlr1bobyw" in fn or "lkx3805bia8" in fn or "xlze_oo4wqs" in fn:
+                score = 3 if "minecraft" in fn else 2
+                candidates.append((score, f))
+            else:
+                # Vídeos horizontais de Minecraft também funcionam perfeitamente para Shorts via scale+crop
                 score = 2 if "minecraft" in fn else 1
                 candidates.append((score, f))
         else:
             if "horizontal" in fn or "u7ieztmf" in fn or "erilpuq5yms" in fn or "64dw7xvh" in fn:
+                score = 3 if "minecraft" in fn else 2
+                candidates.append((score, f))
+            else:
                 score = 2 if "minecraft" in fn else 1
                 candidates.append((score, f))
 
     if not candidates:
         for f in glob.glob(os.path.join(bg_dir, "*.mp4")):
-            fn = os.path.basename(f).lower()
-            score = 2 if "minecraft" in fn else 1
-            candidates.append((score, f))
+            if is_valid_video_file(f, min_size_mb=2.0):
+                fn = os.path.basename(f).lower()
+                score = 2 if "minecraft" in fn else 1
+                candidates.append((score, f))
 
     candidates.sort(key=lambda x: x[0], reverse=True)
     return [c[1] for c in candidates]
@@ -168,11 +159,11 @@ def render_reddit_story_video(
                 # garantindo que nunca atinja o final do arquivo (reprodução 100% contínua sem repetições)
                 max_start = max(0.0, bg_dur - total_duration - 1.0)
                 random_start = random.uniform(0.0, max_start)
-                inputs.extend(["-ss", f"{random_start:.2f}", "-i", bg_to_use])
+                inputs.extend(["-err_detect", "ignore_err", "-fflags", "+genpts+discardcorrupt", "-ss", f"{random_start:.2f}", "-i", bg_to_use])
             else:
                 # Se o vídeo de fundo for mais curto que o áudio, inicia em 00:00 e faz loop completo
                 # evitando loops de fragmentos curtos no final
-                inputs.extend(["-stream_loop", "-1", "-i", bg_to_use])
+                inputs.extend(["-err_detect", "ignore_err", "-fflags", "+genpts+discardcorrupt", "-stream_loop", "-1", "-i", bg_to_use])
             bg_filter = f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,crop={target_w}:{target_h},setsar=1,fps=60[bg];"
         else:
             src_w = 1080 if is_vertical else 1920
@@ -242,5 +233,42 @@ def render_reddit_story_video(
             app_logger.info(f"[RenderEngine] Vídeo master renderizado com sucesso: {output_video_path} ({os.path.getsize(output_video_path)} bytes)")
             return True, output_video_path
         except subprocess.CalledProcessError as e:
+            app_logger.warning(f"[RenderEngine] Falha inicial ao renderizar ({str(e)}). Tentando fallback sem seek aleatório...")
+            if "-ss" in inputs:
+                try:
+                    fallback_inputs = []
+                    skip_next = False
+                    for item in inputs:
+                        if skip_next:
+                            skip_next = False
+                            continue
+                        if item == "-ss":
+                            skip_next = True
+                            continue
+                        fallback_inputs.append(item)
+                    fallback_cmd = [
+                        ffmpeg_bin, "-y",
+                        *fallback_inputs,
+                        "-filter_complex", filter_complex,
+                        "-map", "[vout]",
+                        "-map", f"{audio_map_idx}:a",
+                        "-t", f"{total_duration:.2f}",
+                        "-c:v", "libx264",
+                        "-preset", "ultrafast",
+                        "-crf", "18",
+                        "-pix_fmt", "yuv420p",
+                        "-r", "60",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        "-ar", "44100",
+                        "-shortest",
+                        output_video_path
+                    ]
+                    subprocess.run(fallback_cmd, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
+                    app_logger.info(f"[RenderEngine] Vídeo renderizado com sucesso via fallback seguro: {output_video_path}")
+                    return True, output_video_path
+                except Exception as fb_err:
+                    app_logger.error(f"[RenderEngine] Fallback seguro também falhou: {fb_err}")
+
             app_logger.error(f"[RenderEngine] Erro no render FFmpeg: {e.stderr}")
             return False, f"Falha na renderização: {e.stderr}"
