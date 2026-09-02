@@ -31,7 +31,7 @@ def run_reddit_story_pipeline(
     custom_post: Optional[Dict[str, Any]] = None,
     output_base_dir: str = "checkpoint/auto_batches",
     custom_output_dir: Optional[str] = None,
-    model_name: str = "gemini-flash-lite-latest",
+    model_name: str = "gemini-3.6-flash",
     export_dual_format: bool = True,
     status_callback = None
 ) -> Dict[str, Any]:

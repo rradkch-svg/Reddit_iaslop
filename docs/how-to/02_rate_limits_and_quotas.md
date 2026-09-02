@@ -63,7 +63,7 @@ Além disso, a função `get_prioritized_keys()` promove dinamicamente chaves at
 Se todas as chaves configuradas esgotarem a cota no modelo preferencial, o motor avança sequencialmente entre os modelos definidos em `DEFAULT_FALLBACK_MODELS`:
 
 $$
-\text{gemini-flash-lite-latest} \longrightarrow \text{gemini-3.5-flash-lite} \longrightarrow \text{gemini-3.6-flash} \longrightarrow \text{gemini-3.1-flash-lite}
+\text{gemini-3.6-flash} \longrightarrow \text{gemini-3.5-flash-lite} \longrightarrow \text{gemini-3.1-flash-lite}
 $$
 
 ### C. Cooldown Dinâmico com Barra Regressiva

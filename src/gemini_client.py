@@ -17,7 +17,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_FALLBACK_MODELS = [
     "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
-    "gemini-flash-latest"
+    "gemini-3.1-flash-lite"
 ]
 
 
@@ -176,7 +176,7 @@ def extract_retry_seconds(error_str: str) -> int:
 def generate_with_resilience(
     prompt: str,
     system_instruction: str,
-    model_name: str = "gemini-flash-lite-latest",
+    model_name: str = "gemini-3.6-flash",
     fallback_models: list = None,
     auto_fallback: bool = True,
     auto_cooldown: bool = True,
@@ -262,11 +262,12 @@ def generate_with_resilience(
                     elapsed = round(time.time() - start_time, 1)
                     last_key_error = e
                     is_quota = "ResourceExhausted" in type(e).__name__ or "RESOURCE_EXHAUSTED" in err_text or "Quota exceeded" in err_text or "429" in err_text
+                    is_unavailable = "503" in err_text or "UNAVAILABLE" in err_text or "high demand" in err_text.lower() or "overloaded" in err_text.lower() or "500" in err_text or "502" in err_text
                     is_timeout = "DeadlineExceeded" in type(e).__name__ or "DEADLINE_EXCEEDED" in err_text or "timeout" in err_text.lower() or "504" in err_text
                     
                     if is_timeout:
-                        app_logger.warning(f"[Gemini API] Timeout (> {timeout_seconds}s) no modelo {current_model} (chave {key_display})")
-                        break
+                        app_logger.warning(f"[Gemini API] Timeout (> {timeout_seconds}s) no modelo {current_model} (chave {key_display}). Tentando próxima chave...")
+                        continue
 
                     if is_quota:
                         wait_sec = extract_retry_seconds(err_text)
@@ -281,8 +282,13 @@ def generate_with_resilience(
                         app_logger.warning(f"[Gemini API] Quota atingida na chave {key_display} (espera: {wait_sec}s). Tentando próxima chave...")
                         continue
 
+                    if is_unavailable:
+                        app_logger.warning(f"[Gemini API] Modelo {current_model} em alta demanda (503 UNAVAILABLE) na chave {key_display}. Tentando rotação ou fallback...")
+                        time.sleep(1.0)
+                        continue
+
                     app_logger.error(f"[Gemini API] Erro no modelo {current_model}: {str(e)}")
-                    break
+                    continue
 
             if key_succeeded:
                 break
